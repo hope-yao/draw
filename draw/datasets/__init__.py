@@ -10,9 +10,15 @@ def get_data(data_name):
         from fuel.datasets import MNIST
         img_size = (28, 28)
         channels = 1
-        data_train = MNIST(which_sets=["train"], sources=['features'])
-        data_valid = MNIST(which_sets=["test"], sources=['features'])
-        data_test  = MNIST(which_sets=["test"], sources=['features'])
+
+
+        # Max hack
+        data_train = MNIST(which_sets=["train"], sources=['features','targets'])
+        data_valid = MNIST(which_sets=["test"], sources=['features','targets'])
+        data_test  = MNIST(which_sets=["test"], sources=['features','targets'])
+        # data_train = MNIST(which_sets=["train"], sources=['features'])
+        # data_valid = MNIST(which_sets=["test"], sources=['features'])
+        # data_test  = MNIST(which_sets=["test"], sources=['features'])
     elif data_name == 'bmnist':
         from fuel.datasets.binarized_mnist import BinarizedMNIST
         img_size = (28, 28)

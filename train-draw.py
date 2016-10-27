@@ -159,13 +159,21 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
 
     #------------------------------------------------------------------------
     x = tensor.matrix('features')
-    
-    x_recons, kl_terms = draw.reconstruct(x)
+
+    # MAX hack
+    # x_recons, kl_terms = draw.reconstruct(x)
+    # x_recons, kl_terms, order_terms, background_penalty = draw.reconstruct(x)
+    x_recons, kl_terms, order_terms = draw.reconstruct(x)
 
     recons_term = BinaryCrossEntropy().apply(x, x_recons)
     recons_term.name = "recons_term"
 
-    cost = recons_term + kl_terms.sum(axis=0).mean()
+    # cost = recons_term + kl_terms.sum(axis=0).mean()
+
+    # MAX hack adding a weighted penalty on writing window movement
+    # weight = T.iscalar("weight")
+    # scaled_weight = theano.function([10., order_terms], weight * order_terms)
+    cost = recons_term + kl_terms.sum(axis=0).mean() + order_terms.mean()
     cost.name = "nll_bound"
 
     #------------------------------------------------------------

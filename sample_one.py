@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 
 from __future__ import print_function, division
 
@@ -26,14 +26,12 @@ def scale_norm(arr):
     return arr / scale
 
 # these aren't paramed yet in a generic way, but these values work
-ROWS = 10
-COLS = 20
+COLS = 64
 
 def img_grid(arr, cx, cy, global_scale=True):
     N, channels, height, width = arr.shape
 
-    global ROWS, COLS
-    rows = ROWS
+    global COLS
     cols = COLS
     # rows = int(np.sqrt(N))
     # cols = int(np.sqrt(N))
@@ -44,8 +42,8 @@ def img_grid(arr, cx, cy, global_scale=True):
     # if rows*cols < N:
     #     rows = rows + 1
 
-    total_height = rows * height + 9
-    total_width  = cols * width + 19
+    total_height = height
+    total_width  = cols * width + 63
 
     if global_scale:
         arr = scale_norm(arr)
@@ -64,7 +62,7 @@ def img_grid(arr, cx, cy, global_scale=True):
 
         offset_y, offset_x = r*height+r, c*width+c
         I[0:3, offset_y:(offset_y+height), offset_x:(offset_x+width)] = this
-        # I[0:3, np.round(offset_y + cy[i]), np.round(offset_x + cx[i])] = np.array([255,0,0]).astype(np.uint8)
+        I[0:3, np.max((offset_y + cx[i],0)), np.max((offset_x + cy[i],0))] = np.array([255,0,0]).astype(np.uint8)
 
     # if(channels == 1):
     #     out = I.reshape( (total_height, total_width) )
@@ -79,42 +77,42 @@ def generate_samples(p, subdir, output_size, channels):
         print("Don't know how to handle unpickled %s" % type(p))
         return
 
-    # draw = model.get_top_bricks()[0]
-    # # reset the random generator
-    # del draw._theano_rng
-    # del draw._theano_seed
-    # draw.seed_rng = np.random.RandomState(config.default_seed)
-    #
-    # #------------------------------------------------------------
-    # logging.info("Compiling sample function...")
-    #
-    # n_samples = T.iscalar("n_samples")
-    # samples = draw.sample(n_samples)
-    #
-    # do_sample = theano.function([n_samples], outputs=samples, allow_input_downcast=True)
-    #
-    # #------------------------------------------------------------
-    # logging.info("Sampling and saving images...")
-    #
-    # global ROWS, COLS
-    # samples, cx, cy = do_sample(ROWS*COLS)
-    # #samples = np.random.normal(size=(16, 100, 28*28))
-    #
-    # n_iter, N, D = samples.shape
-    # # logging.info("SHAPE IS: {}".format(samples.shape))
-    #
-    # samples = samples.reshape( (n_iter, N, channels, output_size, output_size) )
-    #
+    draw = model.get_top_bricks()[0]
+    # reset the random generator
+    del draw._theano_rng
+    del draw._theano_seed
+    draw.seed_rng = np.random.RandomState(config.default_seed)
+
+    #------------------------------------------------------------
+    logging.info("Compiling sample function...")
+
+    n_samples = T.iscalar("n_samples")
+    samples = draw.sample(n_samples)
+
+    do_sample = theano.function([n_samples], outputs=samples, allow_input_downcast=True)
+
+    #------------------------------------------------------------
+    logging.info("Sampling and saving images...")
+
+    global COLS
+    samples, cx, cy = do_sample(1)
+    #samples = np.random.normal(size=(16, 100, 28*28))
+
+    n_iter, N, D = samples.shape
+    # logging.info("SHAPE IS: {}".format(samples.shape))
+
+    samples = samples.reshape( (n_iter, N, channels, output_size, output_size) )
+
     # if(n_iter > 0):
     #     img = img_grid(samples[n_iter-1,:,:,:], cx[n_iter-1,:], cy[n_iter-1,:])
     #     img.save("{0}/sample.png".format(subdir))
-    #
-    # for i in xrange(n_iter-1):
-    #     img = img_grid(samples[i,:,:,:], cx[i,:], cy[i,:])
-    #     img.save("{0}/time-{1:03d}.png".format(subdir, i))
-    #
-    # #with open("centers.pkl", "wb") as f:
-    # #    pikle.dump(f, (center_y, center_x, delta))
+
+    # for i in xrange(n_iter):
+    img = img_grid(samples[:,0,:,:,:], cx[:,0], cy[:,0])
+    img.save("{0}/debug.png".format(subdir))
+
+    #with open("centers.pkl", "wb") as f:
+    #    pikle.dump(f, (center_y, center_x, delta))
     # os.system("convert -delay 5 {0}/time-*.png -delay 300 {0}/sample.png {0}/sequence.gif".format(subdir))
 
 if __name__ == "__main__":
@@ -132,7 +130,7 @@ if __name__ == "__main__":
     with open(args.model_file, "rb") as f:
         p = load(f, 'model')
 
-    subdir = "c:\users\p2admin\documents\max\projects\draw\mnist-20161012-235305\sample"
+    subdir = "c:\users\p2admin\documents\max\projects\draw\mnist-20161017-233956\sample_one"
     if not os.path.exists(subdir):
         os.makedirs(subdir)
 

@@ -126,7 +126,35 @@ class ZoomableAttentionWindow(object):
         # apply to the batch of images
         W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0,2,1]))
 
-        return W.reshape((batch_size, channels*N*N))
+        return W.reshape((batch_size, channels, N, N))
+
+
+    def read_large(self, images, center_y, center_x, delta, sigma):
+        N = self.N
+        channels = self.channels
+        batch_size = images.shape[0]
+
+        # Reshape input into proper 2d images
+        I = images.reshape( (batch_size*channels, self.img_height, self.img_width) )
+
+        # Get separable filterbank
+        FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+
+        FY = T.repeat(FY, channels, axis=0)
+        FX = T.repeat(FX, channels, axis=0)
+
+        # apply to the batch of images
+        W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0,2,1]))
+
+
+        # Max hack: convert back to an image
+
+        # apply...
+        II = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+
+        return II.reshape((batch_size, channels * self.img_height * self.img_width))
+
+        # return W.reshape((batch_size, channels*N*N))
 
     def write(self, windows, center_y, center_x, delta, sigma):
         """Write a batch of windows into full sized images.
@@ -173,6 +201,40 @@ class ZoomableAttentionWindow(object):
 
         return I.reshape( (batch_size, channels*self.img_height*self.img_width) )
 
+
+    # Max hack
+    def write_small(self, windows, center_y, center_x, sigma):
+        N = self.N
+        channels = self.channels
+        batch_size = windows.shape[0]
+        # Reshape input into proper 2d windows
+        W = windows.reshape( (batch_size*channels, N, N) )
+        # Get separable filterbank
+        FY, FX = self.filterbank_matrices_small(center_y, center_x, sigma)
+        FY = T.repeat(FY, channels, axis=0)
+        FX = T.repeat(FX, channels, axis=0)
+        # apply...
+        I = my_batched_dot(my_batched_dot(FY.transpose([0,2,1]), W), FX)
+        return I.reshape( (batch_size, channels*self.img_height*self.img_width) )
+
+    def filterbank_matrices_small(self, center_y, center_x, sigma):
+        tol = 1e-4
+        N = self.N
+        rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+        muX = center_x.dimshuffle([0, 'x']) + rng
+        muY = center_y.dimshuffle([0, 'x']) + rng
+        a = tensor.arange(self.img_width, dtype=floatX)
+        b = tensor.arange(self.img_height, dtype=floatX)
+        FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+        FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+        FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+        FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+        return FY, FX
+
+
+
+
+
     def nn2att(self, l):
         """Convert neural-net outputs to attention parameters
     
@@ -205,6 +267,38 @@ class ZoomableAttentionWindow(object):
         delta = (max(self.img_width, self.img_height)-1) / (self.N-1) * delta
     
         return center_y, center_x, delta, sigma, gamma
+
+    def nn2att_const_gamma(self, l):
+        """Convert neural-net outputs to attention parameters
+
+        Parameters
+        ----------
+        layer : :class:`~tensor.TensorVariable`
+            A batch of neural net outputs with shape (batch_size x 5)
+
+        Returns
+        -------
+        center_y : :class:`~tensor.TensorVariable`
+        center_x : :class:`~tensor.TensorVariable`
+        delta : :class:`~tensor.TensorVariable`
+        sigma : :class:`~tensor.TensorVariable`
+        gamma : :class:`~tensor.TensorVariable`
+        """
+        center_y = l[:, 0]
+        center_x = l[:, 1]
+        log_delta = l[:, 2]
+        log_sigma = l[:, 3]
+
+        delta = T.exp(log_delta)
+        sigma = T.exp(log_sigma / 2.)
+
+        # normalize coordinates
+        center_x = (center_x + 1.) / 2. * self.img_width
+        center_y = (center_y + 1.) / 2. * self.img_height
+        delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
+
+        return center_y, center_x, delta, sigma
+
 
 #=============================================================================
 
