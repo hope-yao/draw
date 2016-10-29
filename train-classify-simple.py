@@ -28,9 +28,9 @@ from fuel.streams import DataStream
 from fuel.schemes import SequentialScheme
 from fuel.transformers import Flatten
 
-from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum
+from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum, Scale
 from blocks.bricks import Tanh, Identity
-from blocks.bricks.cost import BinaryCrossEntropy
+from blocks.bricks.cost import BinaryCrossEntropy, CategoricalCrossEntropy, MisclassificationRate
 from blocks.bricks.conv import Convolutional, ConvolutionalSequence
 from blocks.bricks.recurrent import SimpleRecurrent, LSTM
 from blocks.initialization import Constant, IsotropicGaussian, Orthogonal
@@ -107,6 +107,11 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     # ----------------------------------------------------------------------
 
     draw = DrawClassifyModel(image_size=image_size, channels=channels, attention=attention)
+    draw.push_initialization_config()
+    draw.conv_sequence.layers[0].weights_init = Uniform(width=.2)
+    draw.conv_sequence.layers[1].weights_init = Uniform(width=.09)
+    draw.top_mlp.linear_transformations[0].weights_init = Uniform(width=.08)
+    draw.top_mlp.linear_transformations[1].weights_init = Uniform(width=.11)
     draw.initialize()
 
     # ------------------------------------------------------------------------
@@ -116,21 +121,29 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     y_hat = draw.classify(x)
 
     y_hat_last = y_hat[-1,:,:] # output should be batch_size * class
-    # classification_error = -T.mean(T.log(y_hat_last)*y.astype(np.int64))
-    y_int = T.cast(y, 'int16')
-    recognition = -T.mean(T.log(y_hat_last)[T.arange(batch_size), y_int]) # guess (rnn_iter (16), class (10), batch_size)
-    recognition.name = "recognition"
+    # y_hat_last = y_hat
+    # # classification_error = -T.mean(T.log(y_hat_last)*y.astype(np.int64))
+    y_int = T.cast(y, 'int64')
+    # recognition = -T.mean(T.log(y_hat_last)[T.arange(batch_size), y_int]) # guess (rnn_iter (16), class (10), batch_size)
+    # recognition.name = "recognition"
+    #
+    recognition_convergence = (-y_hat*T.log2(y_hat)).sum(axis=1).mean()
+    recognition_convergence.name = "recognition_convergence"
 
-    _, activated_id = T.max_and_argmax(y_hat_last, axis=1)
-    error = theano.tensor.neq(activated_id.flatten(), y_int.flatten()).sum()/float(batch_size)
-    error.name = "error"
 
-    # recognition_convergence = (-y_hat*T.log2(y_hat)).sum(axis=1).mean()
-    # recognition_convergence.name = "recognition_convergence"
+    # from LeNet
+    recognition = (CategoricalCrossEntropy().apply(y_int.flatten(), y_hat_last)
+            .copy(name='recognition'))
+    error = (MisclassificationRate().apply(y_int.flatten(), y_hat_last)
+                  .copy(name='error_rate'))
 
-    cost = recognition
-    # cost = activation + recognition_convergence.mean()
+    # cost = recognition
+    cost = recognition + recognition_convergence.mean()
     cost.name = "cost"
+
+    # _, activated_id = T.max_and_argmax(y_hat_last, axis=1)
+    # error = theano.tensor.neq(activated_id.flatten(), y_int.flatten()).sum()/float(batch_size)
+    error.name = "error"
 
     # ------------------------------------------------------------
     cg = ComputationGraph([cost])
@@ -139,12 +152,13 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     algorithm = GradientDescent(
         cost=cost,
         parameters=params,
-        step_rule=CompositeRule([
-            StepClipping(10.),
-            Adam(learning_rate),
-        ])
+        # step_rule=CompositeRule([
+        #     StepClipping(10.),
+        #     Adam(learning_rate),
+        # ])
         # step_rule=RMSProp(learning_rate),
         # step_rule=Momentum(learning_rate=learning_rate, momentum=0.95)
+        step_rule=Scale(learning_rate=learning_rate)
     )
 
     # ------------------------------------------------------------------------
@@ -222,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, dest="epochs",
                         default=100, help="Number of training epochs to do")
     parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",
-                        default=10000, help="Size of each mini-batch")
+                        default=100, help="Size of each mini-batch")
     parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",
                         default=1e-3, help="Learning rate")
     parser.add_argument("--attention", "-a", type=str, default="",
@@ -230,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument("--niter", type=int, dest="n_iter",
                         default=16, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",
-                        default=16, help="Encoder RNN state dimension") # originally 256
+                        default=256, help="Encoder RNN state dimension") # originally 256
     parser.add_argument("--y-dim", type=int, dest="y_dim",
                         default=10, help="Decoder  RNN state dimension") # dim should be the number of classes
     parser.add_argument("--oldmodel", type=str,

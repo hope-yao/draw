@@ -37,6 +37,7 @@ from blocks.extensions.monitoring import DataStreamMonitoring, TrainingDataMonit
 from blocks.main_loop import MainLoop
 from blocks.model import Model
 from draw.draw_classify_simple import *
+from blocks.serialization import load
 
 # import blocks
 # path = 'C:\Users\p2admin\Documents\Max\Projects\draw\mnist-20161009-204142\mnist'
@@ -47,54 +48,63 @@ from draw.draw_classify_simple import *
 # # with open('C:\Users\p2admin\Documents\Max\Projects\draw\mnist-20161009-204142\mnist', "rb") as f:
 # #     p = pickle.load(f)
 
-attention = 2
-n_iter = 16
-rnn_dim = 64
-y_dim = 10
+# attention = 2
+# n_iter = 16
+# rnn_dim = 64
+# y_dim = 10
+#
+# channels = 1
+# img_height = 28
+# img_width = 28
+# x_dim = channels * img_height * img_width
+#
+# rnninits = {
+#     # 'weights_init': Orthogonal(),
+#     'weights_init': IsotropicGaussian(0.01),
+#     'biases_init': Constant(0.),
+# }
+# inits = {
+#     # 'weights_init': Orthogonal(),
+#     'weights_init': IsotropicGaussian(0.01),
+#     'biases_init': Constant(0.),
+# }
+#
+# # Configure attention mechanism
+# if attention != "":
+#     read_N = attention
+#     read_N = int(read_N)
+#     read_dim = x_dim
+#
+#     reader = AttentionReader(x_dim=x_dim, y_dim=y_dim,
+#                              channels=channels, width=img_width, height=img_height,
+#                              N=read_N, **inits)
+#     attention_tag = "r%d" % read_N
+# else:
+#     read_dim = x_dim
+#     reader = Reader(x_dim=x_dim, y_dim=y_dim, **inits)
+#     attention_tag = "full"
+#
+#
+# rnn = LSTM(dim=rnn_dim, name="RNN", **rnninits)
+# encoder_mlp = MLP([Identity()], [(read_dim + rnn_dim), 4 * rnn_dim], name="MLP_enc", **inits)
+# decoder_mlp = MLP([Identity()], [rnn_dim, y_dim], name="MLP_dec", **inits)
 
+
+
+
+image_size = (28, 28)
 channels = 1
-img_height = 28
-img_width = 28
-x_dim = channels * img_height * img_width
+attention = '5'
+x_dim = 784
 
-rnninits = {
-    # 'weights_init': Orthogonal(),
-    'weights_init': IsotropicGaussian(0.01),
-    'biases_init': Constant(0.),
-}
-inits = {
-    # 'weights_init': Orthogonal(),
-    'weights_init': IsotropicGaussian(0.01),
-    'biases_init': Constant(0.),
-}
+model_file = 'C:\Users\p2admin\Documents\Max\Projects\draw\mnist-simple-20161027-154135\mnist'
+logging.info("Loading file %s..." % model_file)
+with open(model_file, "rb") as f:
+    model = load(f, 'model')
 
-# Configure attention mechanism
-if attention != "":
-    read_N = attention
-    read_N = int(read_N)
-    read_dim = x_dim
-
-    reader = AttentionReader(x_dim=x_dim, y_dim=y_dim,
-                             channels=channels, width=img_width, height=img_height,
-                             N=read_N, **inits)
-    attention_tag = "r%d" % read_N
-else:
-    read_dim = x_dim
-    reader = Reader(x_dim=x_dim, y_dim=y_dim, **inits)
-    attention_tag = "full"
-
-
-rnn = LSTM(dim=rnn_dim, name="RNN", **rnninits)
-encoder_mlp = MLP([Identity()], [(read_dim + rnn_dim), 4 * rnn_dim], name="MLP_enc", **inits)
-decoder_mlp = MLP([Identity()], [rnn_dim, y_dim], name="MLP_dec", **inits)
-
-draw = DrawClassifyModel(
-    n_iter,
-    reader=reader,
-    encoder_mlp=encoder_mlp,
-    rnn=rnn,
-    decoder_mlp=decoder_mlp)
-draw.initialize()
+draw = model.get_top_bricks()[0]
+# draw = DrawClassifyModel(image_size=image_size, channels=channels, attention=attention)
+# draw.initialize()
 
 # ------------------------------------------------------------------------
 data_size = 2
