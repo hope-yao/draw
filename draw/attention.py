@@ -82,6 +82,25 @@ class ZoomableAttentionWindow(object):
 
         return FY, FX
 
+    def filterbank_matrices_constant_gamma(self, center_y, center_x):
+        tol = 1e-4
+        N = self.N
+
+        rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+
+        muX = center_x.dimshuffle([0, 'x'])
+        muY = center_y.dimshuffle([0, 'x'])
+
+        a = tensor.arange(self.img_width, dtype=floatX)
+        b = tensor.arange(self.img_height, dtype=floatX)
+
+        FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. )
+        FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. )
+        FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+        FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+
+        return FY, FX
+
 
     def read(self, images, center_y, center_x, delta, sigma):
         """Extract a batch of attention windows from the given images.
@@ -128,10 +147,16 @@ class ZoomableAttentionWindow(object):
 
         return W.reshape((batch_size, channels, N, N))
 
-    def read_large(self, images, center_y, center_x, delta, sigma):
+    def read_large(self, images, center_y, center_x):
         N = self.N
         channels = self.channels
         batch_size = images.shape[0]
+
+        # delta = T.cast(theano.shared(np.ones(100)), 'float32')
+        # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
+        delta = T.ones([batch_size], 'float32')
+        sigma = T.ones([batch_size], 'float32')
+
 
         # Reshape input into proper 2d images
         I = images.reshape( (batch_size*channels, self.img_height, self.img_width) )
@@ -283,18 +308,18 @@ class ZoomableAttentionWindow(object):
         """
         center_y = l[:, 0]
         center_x = l[:, 1]
-        log_delta = l[:, 2]
-        log_sigma = l[:, 3]
+        # log_delta = l[:, 2]
+        # log_sigma = l[:, 3]
 
-        delta = T.exp(log_delta)
-        sigma = T.exp(log_sigma / 2.)
+        # delta = T.exp(log_delta)
+        # sigma = T.exp(log_sigma / 2.)
 
         # normalize coordinates
         center_x = (center_x + 1.) / 2. * self.img_width
         center_y = (center_y + 1.) / 2. * self.img_height
-        delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
+        # delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
 
-        return center_y, center_x, delta, sigma
+        return center_y, center_x
 
 
 #=============================================================================

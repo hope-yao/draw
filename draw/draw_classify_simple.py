@@ -70,7 +70,7 @@ class AttentionReader(Initializable):
         self.output_dim = (height, width)
 
         self.zoomer = ZoomableAttentionWindow(channels, height, width, N)
-        self.readout = MLP(activations=[Identity()], dims=[c_dim, 4], **kwargs) # input is the output from RNN
+        self.readout = MLP(activations=[Identity()], dims=[c_dim, 2], **kwargs) # input is the output from RNN
 
         self.children = [self.readout]
 
@@ -84,15 +84,15 @@ class AttentionReader(Initializable):
         else:
             raise ValueError
 
-    @application(inputs=['x', 'c'], outputs=['r', 'cx', 'cy', 'delta', 'sigma'])
+    @application(inputs=['x', 'c'], outputs=['r', 'cx', 'cy'])
     def apply(self, x, c):
         l = self.readout.apply(c)
 
-        center_y, center_x, delta, sigma = self.zoomer.nn2att_const_gamma(l)
+        center_y, center_x = self.zoomer.nn2att_const_gamma(l)
 
-        r = self.zoomer.read_large(x, center_y, center_x, delta, sigma)
+        r = self.zoomer.read_large(x, center_y, center_x)
 
-        return r, center_x, center_y, delta, sigma
+        return r, center_x, center_y
 
 class DrawClassifyModel(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
@@ -148,9 +148,9 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 #-----------------------------------------------------------------------------------------------------------------------
         # USE LeNet
 
-        feature_maps = [20, 50]
-        mlp_hiddens = [500]
-        conv_sizes = [5, 5]
+        feature_maps = [20, 50] #[20, 50]
+        mlp_hiddens = [500] # 500
+        conv_sizes = [5, 5] # [5, 5]
         pool_sizes = [2, 2]
         image_size = (28, 28)
         output_size = 10
@@ -258,7 +258,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 
     @recurrent(sequences=['dummy'], contexts=['x'],
                states=['r', 'c'],
-               outputs=['y', 'r', 'c', 'cx', 'cy', 'delta', 'sigma'])
+               outputs=['y', 'r', 'c', 'cx', 'cy'])
     def apply(self, c, r, x, dummy):
         # r, cx, cy, delta, sigma = self.reader.apply(x, c)
         # a = self.encoder_conv.apply(r)
@@ -271,18 +271,18 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         # c = c + cc
         # y = self.decoder_mlp.apply(c)
 
-        rr, center_y, center_x, delta, sigma = self.reader.apply(x, c)
+        rr, center_y, center_x = self.reader.apply(x, c)
         r = r + rr # combine revealed images
         batch_size = r.shape[0]
         c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,28,28)))
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 
-        return y, r, c, center_x, center_y, delta, sigma
+        return y, r, c, center_x, center_y
 
     # ------------------------------------------------------------------------
 
-    @application(inputs=['features'], outputs=['targets'])
+    @application(inputs=['features'], outputs=['targets', 'r', 'c', 'cx', 'cy'])
     def classify(self, features):
         batch_size = features.shape[0]
         # Sample from mean-zeros std.-one Gaussian
@@ -291,6 +291,6 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
             avg=0., std=1.)
 
         # y, r, c, center_x, center_y, delta, sigma = self.apply(x=features, dummy=u)
-        y, _, _, _, _, _, _ = self.apply(x=features, dummy=u)
+        y, r, c, cx, cy = self.apply(x=features, dummy=u)
 
-        return y
+        return y, r, c, cx, cy

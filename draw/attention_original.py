@@ -309,7 +309,7 @@ if __name__ == "__main__":
 
     center_y = 200.5
     center_x = 330.5
-    delta = 5.
+    delta = 1.
     sigma = 2.
 
 

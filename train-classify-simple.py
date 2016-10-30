@@ -137,8 +137,8 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     error = (MisclassificationRate().apply(y_int.flatten(), y_hat_last)
                   .copy(name='error_rate'))
 
-    # cost = recognition
-    cost = recognition + recognition_convergence.mean()
+    cost = recognition
+    # cost = recognition + recognition_convergence.mean()
     cost.name = "cost"
 
     # _, activated_id = T.max_and_argmax(y_hat_last, axis=1)

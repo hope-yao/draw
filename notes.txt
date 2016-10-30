@@ -1,0 +1,9 @@
+10/29/2016
+currently running:
+1. lr 1e-3
+2. lr 1e-5
+3. lr 1e-3 iter 1 low d conv
+4. lr 1e-3 iter 1 low d conv, no delta sigma
+5. lr 1e-3 iter 1 low d conv, no delta sigma, 100 train iter, no entropy, 1 t step, window size 28 - this case works, data in: mnist-simple-20161029-232558/mnist
+6. lr 1e-3 iter 1 low d conv, no delta sigma, 100 train iter, no entropy, 2 t step, window size 14 - this case works, data in: mnist-simple-20161030-002342/mnist
+7. lr 1e-3 iter 1 low d conv, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7
