@@ -118,7 +118,7 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     x = tensor.matrix('features') # keyword from fuel
     y = tensor.matrix('targets') # keyword from fuel
 
-    y_hat = draw.classify(x)
+    y_hat, _, _, _, _ = draw.classify(x)
 
     y_hat_last = y_hat[-1,:,:] # output should be batch_size * class
     # y_hat_last = y_hat

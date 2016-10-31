@@ -98,7 +98,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
         super(DrawClassifyModel, self).__init__(**kwargs)
 
-        self.n_iter = 4
+        self.n_iter = 8
         y_dim = 10
         rnn_dim = 64
         num_filters = 16
