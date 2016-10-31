@@ -6,5 +6,7 @@ currently running:
 4. lr 1e-3, low d conv, no delta sigma, 1 t step
 5. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 1 t step, window size 28 - this case works, data in: mnist-simple-20161029-232558/mnist
 6. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 2 t step, window size 14 - this case works, data in: mnist-simple-20161030-002342/mnist
-7. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7 - still waiting, data in: mnist-simple-20161030-143956/mnist
-8. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 8 t step, window size 5
+7. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-143956/mnist - this should be working but somehow I stopped prematurely, rerun on 9
+8. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 8 t step, window size 5 - still waiting, data in: mnist-simple-20161030-170531/mnist
+9. lr 1e-3, low d conv, no delta sigma, 300 train iter, no entropy, 4 t step, window size 7 - still waiting, data in: mnist-simple-20161030-204133/mnist
+10. lr 1e-3, low d conv, no delta sigma, 300 train iter, w/ entropy, 4 t step, window size 7 - still waiting, data in: mnist-simple-20161030-222315/mnist

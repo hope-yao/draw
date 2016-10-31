@@ -127,7 +127,8 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     # recognition = -T.mean(T.log(y_hat_last)[T.arange(batch_size), y_int]) # guess (rnn_iter (16), class (10), batch_size)
     # recognition.name = "recognition"
     #
-    recognition_convergence = (-y_hat*T.log2(y_hat)).sum(axis=1).mean()
+    tol = 1e-4
+    recognition_convergence = (-y_hat*T.log2(y_hat+tol)).sum(axis=2).sum(axis=0).mean()
     recognition_convergence.name = "recognition_convergence"
 
 
@@ -137,8 +138,8 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     error = (MisclassificationRate().apply(y_int.flatten(), y_hat_last)
                   .copy(name='error_rate'))
 
-    cost = recognition
-    # cost = recognition + recognition_convergence.mean()
+    # cost = recognition
+    cost = recognition + recognition_convergence.mean()
     cost.name = "cost"
 
     # _, activated_id = T.max_and_argmax(y_hat_last, axis=1)

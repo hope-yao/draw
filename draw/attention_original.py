@@ -265,10 +265,10 @@ class ZoomableAttentionWindow(object):
 if __name__ == "__main__":
     from PIL import Image
 
-    N = 40
+    N = 7
     channels = 3
-    height = 480
-    width = 640
+    height = 28
+    width = 28
 
     # ------------------------------------------------------------------------
     att = ZoomableAttentionWindow(channels, height, width, N)
@@ -300,17 +300,17 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------------
 
-    I = Image.open("cat.jpg")
-    I = I.resize((640, 480))  # .convert('L')
+    I = Image.open("full.png")
+    I = I.resize((28, 28))  # .convert('L')
 
     I = np.asarray(I).transpose([2, 0, 1])
     I = I.reshape((channels * width * height))
     I = I / 255.
 
-    center_y = 200.5
-    center_x = 330.5
+    center_y = 15
+    center_x = 12
     delta = 1.
-    sigma = 2.
+    sigma = 1.
 
 
     def vectorize(*args):

@@ -61,7 +61,7 @@ def scale_norm(arr):
 ROWS = 8
 COLS = 8
 
-def img_grid(y, arr, cx, cy, global_scale=True):
+def img_grid(y, arr, cx, cy, x, global_scale=True):
     N, channels, height, width = arr.shape
     cx = cx.flatten()
     cy = cy.flatten()
@@ -78,8 +78,8 @@ def img_grid(y, arr, cx, cy, global_scale=True):
     # if rows*cols < N:
     #     rows = rows + 1
 
-    total_height = rows * height + 7
-    total_width  = cols * width + 7
+    total_height = rows * height + (ROWS-1)
+    total_width  = cols * width + (COLS-1)
 
     if global_scale:
         arr = scale_norm(arr)
@@ -98,17 +98,25 @@ def img_grid(y, arr, cx, cy, global_scale=True):
 
         offset_y, offset_x = r*height+r, c*width+c
         I[0:3, offset_y:(offset_y+height), offset_x:(offset_x+width)] = this
-        c_y = np.max((np.min((cy[i], 27)), 0))
-        c_x = np.max((np.min((cx[i], 27)), 0))
+        c_x = np.max((np.min((cy[i], 27)), 0))
+        c_y = np.max((np.min((cx[i], 27)), 0))
         I[0:3, np.round(offset_y + c_y), np.round(offset_x + c_x)] = np.array([255,0,0]).astype(np.uint8)
+
+    I_full = np.zeros((3, height, width))
+    I_full[:,:,:] = (255*x).astype(np.uint8)
+    full = np.dstack(I_full).astype(np.uint8)
+
 
     # if(channels == 1):
     #     out = I.reshape( (total_height, total_width) )
     # else:
     out = np.dstack(I).astype(np.uint8)
     img = Image.fromarray(out)
-    print('-'.join(['%d' % np.dot(i,np.arange(10)) for i in y]))
-    return img
+    full_img = Image.fromarray(full)
+    activated_id = np.argmax(y.reshape((N,10)), axis=1)
+    # print('-'.join(['%d' % np.dot(i,np.arange(10)) for i in y]))
+    print(activated_id)
+    return img, full_img
 
 
 def run_classifier(p, subdir):
@@ -123,16 +131,17 @@ def run_classifier(p, subdir):
     image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
 
     # take a single test point
-    image_id = 1000
-    feature_test = data_test._data_sources[0][image_id].reshape(1,1,28,28)
-    label_test = data_test._data_sources[1][image_id]
+    # image_id = range(data_train._data_sources[0].shape[0])
+    image_id = range(1)
+    feature_test = data_train._data_sources[0][image_id].reshape(len(image_id),1,28,28)/float(255)
+    label_test = data_train._data_sources[1][image_id]
     print('gt: %d' % label_test[0])
 
     draw = model.get_top_bricks()[0]
     # reset the random generator
-    del draw._theano_rng
-    del draw._theano_seed
-    draw.seed_rng = np.random.RandomState(config.default_seed)
+    # del draw._theano_rng
+    # del draw._theano_seed
+    # draw.seed_rng = np.random.RandomState(config.default_seed)
 
     #------------------------------------------------------------
     logging.info("Compiling classify function...")
@@ -147,18 +156,34 @@ def run_classifier(p, subdir):
 
     global ROWS, COLS
     y,r,c,cx,cy = do_classify(feature_test)
+    # y,_,_,_,_ = do_classify(feature_test)
+
+    y_last = y[-1,:,:] # output should be batch_size * class
+    # y_hat_last = y_hat
+    # # classification_error = -T.mean(T.log(y_hat_last)*y.astype(np.int64))
+    label_test = label_test.astype('int64')
+    # error = (MisclassificationRate().apply(label_test.flatten(), y_last)
+    #          .copy(name='error_rate'))
+    activated_id = np.argmax(y_last, axis=1)
+    error = (activated_id.flatten()!=label_test.flatten()).sum()/float(1)
+
+    tol = 1e-4
+    recognition_convergence = (-y*np.log2(y+tol)).sum(axis=2).sum(axis=0).mean()
+    print(error)
+
     n_iter = y.shape[0]
     r = r.reshape((n_iter,1,28,28))
-    img = img_grid(y, r, cx, cy)
+    img, full_img = img_grid(y, r, cx, cy, feature_test)
     img.save("{0}/result.png".format(subdir))
+    full_img.save("{0}/full.png".format(subdir))
 
 
 
-model_file = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-002342\mnist'
+model_file = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-204133\mnist'
 with open(model_file, "rb") as f:
     p = load(f, 'model')
 
-subdir = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-002342/result'
+subdir = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-204133/result'
 if not os.path.exists(subdir):
     os.makedirs(subdir)
 
