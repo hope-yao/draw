@@ -43,6 +43,8 @@ from blocks.extensions.saveload import Checkpoint
 from blocks.extensions.monitoring import DataStreamMonitoring, TrainingDataMonitoring
 from blocks.main_loop import MainLoop
 from blocks.model import Model
+from blocks.serialization import load
+
 
 try:
     from blocks.extras import Plot
@@ -185,41 +187,74 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
             Plot(name, channels=plot_channels)
         ]
 
-    main_loop = MainLoop(
-        model=Model(cost),
-        data_stream=train_stream,
-        algorithm=algorithm,
-        extensions=[
-                       Timing(),
-                       FinishAfter(after_n_epochs=epochs),
-                       TrainingDataMonitoring(
-                           train_monitors,
-                           prefix="train",
-                           after_epoch=True),
-                       #            DataStreamMonitoring(
-                       #                monitors,
-                       #                valid_stream,
-                       ##                updates=scan_updates,
-                       #                prefix="valid"),
-                       DataStreamMonitoring(
-                           monitors,
-                           test_stream,
-                           #                updates=scan_updates,
-                           prefix="test"),
-                       # Checkpoint(name, before_training=False, after_epoch=True, save_separately=['log', 'model']),
-                       Checkpoint("{}/{}".format(subdir, name), save_main_loop=False, before_training=True,
-                                  after_epoch=True, save_separately=['log', 'model']),
-                       # SampleCheckpoint(image_size=image_size[0], channels=channels, save_subdir=subdir,
-                       #                  before_training=True, after_epoch=True),
-                       ProgressBar(),
-                       Printing()] + plotting_extensions)
-
     if oldmodel is not None:
         print("Initializing parameters with old model %s" % oldmodel)
         with open(oldmodel, "rb") as f:
-            oldmodel = pickle.load(f)
-            main_loop.model.set_parameter_values(oldmodel.get_param_values())
-        del oldmodel
+            # oldmodel = pickle.load(f)
+            oldmodel = load(f, 'model')
+            # main_loop.model.set_parameter_values(oldmodel.get_top_bricks()[0])
+            main_loop = MainLoop(
+                model=oldmodel,
+                data_stream=train_stream,
+                algorithm=algorithm,
+                extensions=[
+                               Timing(),
+                               FinishAfter(after_n_epochs=epochs),
+                               TrainingDataMonitoring(
+                                   train_monitors,
+                                   prefix="train",
+                                   after_epoch=True),
+                               #            DataStreamMonitoring(
+                               #                monitors,
+                               #                valid_stream,
+                               ##                updates=scan_updates,
+                               #                prefix="valid"),
+                               DataStreamMonitoring(
+                                   monitors,
+                                   test_stream,
+                                   #                updates=scan_updates,
+                                   prefix="test"),
+                               # Checkpoint(name, before_training=False, after_epoch=True, save_separately=['log', 'model']),
+                               Checkpoint("{}/{}".format(subdir, name), save_main_loop=False, before_training=True,
+                                          after_epoch=True, save_separately=['log', 'model']),
+                               # SampleCheckpoint(image_size=image_size[0], channels=channels, save_subdir=subdir,
+                               #                  before_training=True, after_epoch=True),
+                               ProgressBar(),
+                               Printing()] + plotting_extensions)
+
+
+        # del oldmodel
+    else:
+        main_loop = MainLoop(
+            model=Model(cost),
+            data_stream=train_stream,
+            algorithm=algorithm,
+            extensions=[
+                           Timing(),
+                           FinishAfter(after_n_epochs=epochs),
+                           TrainingDataMonitoring(
+                               train_monitors,
+                               prefix="train",
+                               after_epoch=True),
+                           #            DataStreamMonitoring(
+                           #                monitors,
+                           #                valid_stream,
+                           ##                updates=scan_updates,
+                           #                prefix="valid"),
+                           DataStreamMonitoring(
+                               monitors,
+                               test_stream,
+                               #                updates=scan_updates,
+                               prefix="test"),
+                           # Checkpoint(name, before_training=False, after_epoch=True, save_separately=['log', 'model']),
+                           Checkpoint("{}/{}".format(subdir, name), save_main_loop=False, before_training=True,
+                                      after_epoch=True, save_separately=['log', 'model']),
+                           # SampleCheckpoint(image_size=image_size[0], channels=channels, save_subdir=subdir,
+                           #                  before_training=True, after_epoch=True),
+                           ProgressBar(),
+                           Printing()] + plotting_extensions)
+
+
 
     main_loop.run()
 
