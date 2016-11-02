@@ -179,7 +179,7 @@ def run_classifier(p, subdir):
 
 
 
-model_file = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-204133\mnist'
+model_file = './rj/mnistXXX'
 with open(model_file, "rb") as f:
     p = load(f, 'model')
 
