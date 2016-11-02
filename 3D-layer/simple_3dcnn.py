@@ -714,13 +714,13 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
 
     # Use ReLUs everywhere and softmax for the final prediction
     conv_activations = [Rectifier() for _ in feature_maps]
-    mlp_activations = [Rectifier() for _ in mlp_hiddens]
+    mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Softmax()]
     convnet = LeNet(conv_activations, 1, image_size,
                     filter_sizes=[(5,5,5)],
                     feature_maps=feature_maps,
                     pooling_sizes=[(2,2,2)],
                     top_mlp_activations=mlp_activations,
-                    top_mlp_dims=mlp_hiddens,
+                    top_mlp_dims=mlp_hiddens + [output_size],
                     border_mode='valid',
                     weights_init=Uniform(width=.2),
                     biases_init=Constant(0))
@@ -730,7 +730,7 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
     convnet.layers[0].weights_init = Uniform(width=.2)
     # convnet.layers[1].weights_init = Uniform(width=.09)
     convnet.top_mlp.linear_transformations[0].weights_init = Uniform(width=.08)
-    # convnet.top_mlp.linear_transformations[1].weights_init = Uniform(width=.11)
+    convnet.top_mlp.linear_transformations[1].weights_init = Uniform(width=.11)
     convnet.initialize()
     logging.info("Input dim: {} {} {} {}".format(
         *convnet.children[0].get_dim('input_')))

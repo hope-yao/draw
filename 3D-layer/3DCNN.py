@@ -262,7 +262,8 @@ class ConvolutionalTranspose3(Convolutional3):
         # The AbstractConv2d_gradInputs op takes a kernel that was used for the
         # **convolution**. We therefore have to invert num_channels and
         # num_filters for W.
-        W = W.transpose(1, 0, 2, 3)
+        # W = W.transpose(1, 0, 2, 3)
+        W = W.transpose(1, 0, 2, 3, 4)
         imshp = (None,) + self.get_dim('output')
         kshp = (filter_shape[1], filter_shape[0]) + filter_shape[2:]
         return AbstractConv3d_gradInputs(
@@ -543,7 +544,7 @@ class Flattener3(Brick):
     """
     @application(inputs=['input_'], outputs=['output'])
     def apply(self, input_):
-        return input_.flatten(ndim=3)
+        return input_.flatten(ndim=2)
 
 
 #
