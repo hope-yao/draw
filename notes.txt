@@ -1,12 +1,33 @@
-10/29/2016
-currently running:
+10/31/2016
+Attention - running history:
 1. lr 1e-3
 2. lr 1e-5
 3. lr 1e-3, low d conv, 1 t step
 4. lr 1e-3, low d conv, no delta sigma, 1 t step
 5. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 1 t step, window size 28 - this case works, data in: mnist-simple-20161029-232558/mnist
 6. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 2 t step, window size 14 - this case works, data in: mnist-simple-20161030-002342/mnist
-7. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-143956/mnist - this should be working but somehow I stopped prematurely, rerun on 9
-8. lr 1e-3, low d conv, no delta sigma, 100 train iter, no entropy, 8 t step, window size 5 - stopped, data in: mnist-simple-20161030-170531/mnist - stopped after 100 iter, error~0.4, continue to run in 11
-9. lr 1e-3, low d conv, no delta sigma, 300 train iter, no entropy, 4 t step, window size 7 - still waiting, data in: mnist-simple-20161030-204133/mnist
-10. lr 1e-3, low d conv, no delta sigma, 300 train iter, w/ entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-222315/mnist - no good, does not converge on error
+
+7. lr 1e-3, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-143956/mnist - this should be working but somehow I stopped prematurely, rerun on 9
+8. lr 1e-3, no delta sigma, 100 train iter, no entropy, 8 t step, window size 5 - stopped, data in: mnist-simple-20161030-170531/mnist - stopped after 100 iter, error~0.4, ***need to run longer
+9. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 7 - done, data in: mnist-simple-20161030-204133/mnist - ~4.5% test error after 300 iter
+10. lr 1e-3, no delta sigma, 300 train iter, w/ entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-222315/mnist - no good, does not converge on error
+
+11. lr 1e-3, no delta sigma, 100 train iter, no entropy, 8 t step, window size 7 - stopped, data in: mnist-simple-20161031-/mnist - following 8, now testing the idea of switching the obj between categoricalentropy and convergence
+
+12. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5 - running, data in: mnist-simple-20161101-203844/mnist - test if without being able to fully reveal the image, can still classify correctly
+
+#13 I realized that n_iter can be reset in the test, and also from the result, it looks like reader is trying to reinforce its current belief which could be wrong,
+#so now test a cost function that minimizes categoricalentropy and MAXIMIZES entropy
+#Also add a layer to reader to allow more flexibility
+#Also clipped r to [0, 1]
+13. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5, reader 2 layer - running, data in: mnist-simple-20161101-232031/mnist
+
+#14 test the idea of gradually increase the iter, (and possibly also decrease the window size), to see if the model converges better
+#now take '12' and increase iter to 4
+14. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 5 - running, data in: mnist-simple-20161101-203844/mnist
+
+
+
+
+LeNet
+~1% test error on MNIST after 50 iter
