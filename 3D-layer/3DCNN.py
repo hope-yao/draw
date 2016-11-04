@@ -245,7 +245,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = ArgumentParser("An example of training a convolutional network "
                             "on 3D ShapeNet10 dataset.")
-    parser.add_argument("--num-epochs", type=int, default=2,
+    parser.add_argument("--num-epochs", type=int, default=20,
                         help="Number of training epochs to do.")
     parser.add_argument("save_to", default="shapenet.pkl", nargs="?",
                         help="Destination to save the state of the training "
