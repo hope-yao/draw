@@ -132,12 +132,15 @@ def run_classifier(p, subdir):
 
     # take a single test point
     # image_id = range(data_train._data_sources[0].shape[0])
-    image_id = range(1)
+    image_id = range(100)
     feature_test = data_train._data_sources[0][image_id].reshape(len(image_id),1,28,28)/float(255)
     label_test = data_train._data_sources[1][image_id]
-    print('gt: %d' % label_test[0])
+    # print('gt: %d' % label_test[0])
 
     draw = model.get_top_bricks()[0]
+    draw.n_iter = 16 # test if n_iter can change
+
+
     # reset the random generator
     # del draw._theano_rng
     # del draw._theano_seed
@@ -155,8 +158,8 @@ def run_classifier(p, subdir):
     logging.info("Sampling and saving images...")
 
     global ROWS, COLS
-    y,r,c,cx,cy = do_classify(feature_test)
-    # y,_,_,_,_ = do_classify(feature_test)
+    # y,r,c,cx,cy = do_classify(feature_test)
+    y,_,_,_,_ = do_classify(feature_test)
 
     y_last = y[-1,:,:] # output should be batch_size * class
     # y_hat_last = y_hat
@@ -165,17 +168,19 @@ def run_classifier(p, subdir):
     # error = (MisclassificationRate().apply(label_test.flatten(), y_last)
     #          .copy(name='error_rate'))
     activated_id = np.argmax(y_last, axis=1)
-    error = (activated_id.flatten()!=label_test.flatten()).sum()/float(1)
+    error = (activated_id.flatten()!=label_test.flatten()).sum()/float(100)
 
     tol = 1e-4
     recognition_convergence = (-y*np.log2(y+tol)).sum(axis=2).sum(axis=0).mean()
     print(error)
+    ## missclassified ones: 24, 48, 80, ...
 
-    n_iter = y.shape[0]
-    r = r.reshape((n_iter,1,28,28))
-    img, full_img = img_grid(y, r, cx, cy, feature_test)
-    img.save("{0}/result.png".format(subdir))
-    full_img.save("{0}/full.png".format(subdir))
+
+    # n_iter = y.shape[0]
+    # r = r.reshape((n_iter,1,28,28))
+    # img, full_img = img_grid(y, r, cx, cy, feature_test)
+    # img.save("{0}/result.png".format(subdir))
+    # full_img.save("{0}/full.png".format(subdir))
 
 
 
