@@ -70,7 +70,10 @@ class AttentionReader(Initializable):
         self.output_dim = (height, width)
 
         self.zoomer = ZoomableAttentionWindow(channels, height, width, N)
-        self.readout = MLP(activations=[Identity()], dims=[c_dim, 2], **kwargs) # input is the output from RNN
+        # self.readout = MLP(activations=[Identity()], dims=[c_dim, 2],
+        #                    **kwargs)  # input is the output from RNN
+        reader_dim = [c_dim, 16, 2]
+        self.readout = MLP(activations=[Rectifier(), Rectifier()], dims=reader_dim, **kwargs) # input is the output from RNN
 
         self.children = [self.readout]
 
@@ -98,7 +101,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
         super(DrawClassifyModel, self).__init__(**kwargs)
 
-        self.n_iter = 8
+        self.n_iter = 3
         y_dim = 10
         rnn_dim = 64
         num_filters = 16
@@ -272,7 +275,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         # y = self.decoder_mlp.apply(c)
 
         rr, center_y, center_x = self.reader.apply(x, c)
-        r = r + rr # combine revealed images
+        r = T.minimum(r + rr,1.) # combine revealed images
         batch_size = r.shape[0]
         c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,28,28)))
         c = self.flattener.apply(c_raw)
