@@ -32,11 +32,10 @@ from blocks.initialization import Constant, Uniform
 from blocks.main_loop import MainLoop
 from blocks.model import Model
 from blocks.monitoring import aggregation
-from fuel.datasets import MNIST
 from fuel.schemes import ShuffledScheme
 from fuel.streams import DataStream
+from fuel.datasets.hdf5 import H5PYDataset
 from toolz.itertoolz import interleave
-import numpy as np
 import theano.tensor as T
 from blocks.initialization import Constant, Uniform, IsotropicGaussian
 theano.config.floatX = 'float32'
@@ -140,17 +139,17 @@ class LeNet(FeedforwardSequence, Initializable):
 
 
 def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
-         conv_sizes=None, pool_sizes=None, batch_size=500,
+         conv_sizes=None, pool_sizes=None, batch_size=100,
          num_batches=None):
     if feature_maps is None:
-        feature_maps = [20, 50]
+        feature_maps = [16, 32]
     if mlp_hiddens is None:
-        mlp_hiddens = [500]
+        mlp_hiddens = [200]
     if conv_sizes is None:
         conv_sizes = [5, 5, 5]
     if pool_sizes is None:
         pool_sizes = [2, 2, 2]
-    image_size = (28, 28, 28)
+    image_size = (32, 32, 32)
     output_size = 10
 
     # Use ReLUs everywhere and softmax for the final prediction
@@ -195,17 +194,19 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
                   .copy(name='error_rate'))
 
     cg = ComputationGraph([cost, error_rate])
+    from blocks.filter import VariableFilter
+    from blocks.roles import PARAMETER
 
-    mnist_train = MNIST(("train",))
-    mnist_train_stream = DataStream.default_stream(
-        mnist_train, iteration_scheme=ShuffledScheme(
-            mnist_train.num_examples, batch_size))
+    params = VariableFilter(roles=[PARAMETER])(cg.variables)
 
-    mnist_test = MNIST(("test",))
-    mnist_test_stream = DataStream.default_stream(
-        mnist_test,
-        iteration_scheme=ShuffledScheme(
-            mnist_test.num_examples, batch_size))
+    train_set = H5PYDataset('shapenet10.hdf5', which_sets=('train',))
+    train_set_stream = DataStream.default_stream(
+        train_set, iteration_scheme=ShuffledScheme(
+            train_set.num_examples, batch_size))
+    test_set = H5PYDataset('shapenet10.hdf5', which_sets=('test',))
+    test_set_stream = DataStream.default_stream(
+        test_set, iteration_scheme=ShuffledScheme(
+            test_set.num_examples, batch_size))
 
     # Train with simple SGD
     algorithm = GradientDescent(
@@ -219,7 +220,7 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
                               after_n_batches=num_batches),
                   DataStreamMonitoring(
                       [cost, error_rate],
-                      mnist_test_stream,
+                      test_set_stream,
                       prefix="test"),
                   TrainingDataMonitoring(
                       [cost, error_rate,
@@ -234,7 +235,7 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
 
     main_loop = MainLoop(
         algorithm,
-        mnist_train_stream,
+        train_set_stream,
         model=model,
         extensions=extensions)
 
@@ -243,15 +244,15 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = ArgumentParser("An example of training a convolutional network "
-                            "on the MNIST dataset.")
+                            "on 3D ShapeNet10 dataset.")
     parser.add_argument("--num-epochs", type=int, default=2,
                         help="Number of training epochs to do.")
-    parser.add_argument("save_to", default="mnist.pkl", nargs="?",
+    parser.add_argument("save_to", default="shapenet.pkl", nargs="?",
                         help="Destination to save the state of the training "
                              "process.")
     parser.add_argument("--feature-maps", type=int, nargs='+',
-                        default=[20, 50], help="List of feature maps numbers.")
-    parser.add_argument("--mlp-hiddens", type=int, nargs='+', default=[500],
+                        default=[16, 24], help="List of feature maps numbers.")
+    parser.add_argument("--mlp-hiddens", type=int, nargs='+', default=[250],
                         help="List of numbers of hidden units for the MLP.")
     parser.add_argument("--conv-sizes", type=int, nargs='+', default=[5, 5, 5],
                         help="Convolutional kernels sizes. The kernels are "
@@ -260,7 +261,7 @@ if __name__ == "__main__":
                         help="Pooling sizes. The pooling windows are always "
                              "square. Should be the same length as "
                              "--conv-sizes.")
-    parser.add_argument("--batch-size", type=int, default=500,
+    parser.add_argument("--batch-size", type=int, default=100,
                         help="Batch size.")
     args = parser.parse_args()
     main(**vars(args))
