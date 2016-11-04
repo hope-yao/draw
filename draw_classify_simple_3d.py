@@ -35,8 +35,8 @@ from blocks.model import Model
 from toolz.itertoolz import interleave
 from cnn3d_bricks import Convolutional3, ConvolutionalTranspose3, Pooling3, MaxPooling3, AveragePooling3, ConvolutionalSequence3, Flattener3
 
-from attention import ZoomableAttentionWindow
-from prob_layers import replicate_batch
+from draw.attention import ZoomableAttentionWindow, ZoomableAttentionWindow3d
+from draw.prob_layers import replicate_batch
 
 class Reader(Initializable):
     def __init__(self, x_dim, **kwargs):
@@ -59,19 +59,20 @@ class Reader(Initializable):
     def apply(self, x):
         return x
 
-class AttentionReader(Initializable):
-    def __init__(self, x_dim, c_dim, channels, height, width, N, **kwargs):
-        super(AttentionReader, self).__init__(name="reader", **kwargs)
+class AttentionReader3d(Initializable):
+    def __init__(self, x_dim, c_dim, channels, height, width, depth, N, **kwargs):
+        super(AttentionReader3d, self).__init__(name="reader", **kwargs)
 
         self.img_height = height
         self.img_width = width
+        self.img_depth = depth
         self.N = N
         self.x_dim = x_dim
         self.c_dim = c_dim
-        self.output_dim = (height, width)
+        self.output_dim = (height, width, depth)
 
-        self.zoomer = ZoomableAttentionWindow(channels, height, width, N)
-        self.readout = MLP(activations=[Identity()], dims=[c_dim, 2], **kwargs) # input is the output from RNN
+        self.zoomer = ZoomableAttentionWindow3d(channels, height, width, depth, N)
+        self.readout = MLP(activations=[Identity()], dims=[c_dim, 3], **kwargs) # input is the output from RNN
 
         self.children = [self.readout]
 
@@ -89,15 +90,15 @@ class AttentionReader(Initializable):
     def apply(self, x, c):
         l = self.readout.apply(c)
 
-        center_y, center_x = self.zoomer.nn2att_const_gamma(l)
+        center_x, center_y , center_z = self.zoomer.nn2att_const_gamma(l)
 
-        r = self.zoomer.read_large(x, center_y, center_x)
+        r = self.zoomer.read_large(x, center_x, center_y, center_z, self.N)
 
-        return r, center_x, center_y
+        return r, center_x, center_y, center_z
 
-class DrawClassifyModel(BaseRecurrent, Initializable, Random):
+class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
-        super(DrawClassifyModel, self).__init__(**kwargs)
+        super(DrawClassifyModel3d, self).__init__(**kwargs)
 
         self.n_iter = 8
         y_dim = 10
@@ -118,8 +119,8 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
             'weights_init': Uniform(width=.2),
             'biases_init': Constant(0.)
         }
-        img_height, img_width = image_size
-        self.x_dim = channels * img_height * img_width
+        img_height, img_width, img_depth  = image_size
+        self.x_dim = channels * img_height * img_width * img_depth
 
         # # Configure attention mechanism
         # read_N = attention
@@ -149,28 +150,28 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 #-----------------------------------------------------------------------------------------------------------------------
         # USE LeNet
 
-        feature_maps = [20, 50] #[20, 50]
+        feature_maps = [16, 32] #[20, 50]
         mlp_hiddens = [500] # 500
-        conv_sizes = [5, 5] # [5, 5]
-        pool_sizes = [2, 2]
-        image_size = (28, 28)
+        conv_sizes = [5, 5, 5] # [5, 5]
+        pool_sizes = [2, 2, 2]
+        # image_size = (28, 28)
         output_size = 10
 
         conv_activations = [Rectifier() for _ in feature_maps]
         mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Softmax()]
 
         num_channels = 1
-        image_shape = (28, 28)
-        filter_sizes = zip(conv_sizes, conv_sizes)
+        image_shape = (32, 32, 32)
+        filter_sizes = [(5,5,5),(5,5,5)]
         feature_maps = feature_maps
-        pooling_sizes = zip(pool_sizes, pool_sizes)
+        pooling_sizes = [(2,2,2),(2,2,2)]
         top_mlp_activations = mlp_activations
         top_mlp_dims = mlp_hiddens + [output_size]
-        border_mode = 'full'
+        border_mode = 'valid'
 
         conv_step = None
         if conv_step is None:
-            self.conv_step = (1, 1)
+            self.conv_step = (1, 1, 1)
         else:
             self.conv_step = conv_step
         self.num_channels = num_channels
@@ -209,8 +210,8 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         self.conv_sequence._push_allocation_config()
         conv_out_dim = self.conv_sequence.get_dim('output')
         self.conv_out_dim_flatten = np.prod(conv_out_dim)
-        reader = AttentionReader(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
-                                 channels=channels, width=img_width, height=img_height,
+        reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
+                                 channels=channels, width=img_width, height=img_height, depth =img_depth,
                                  N=read_N, **inits)
         # reader = Reader(x_dim=self.x_dim)
 
@@ -253,7 +254,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         elif name == 'delta':
             return 1
         else:
-            super(DrawClassifyModel, self).get_dim(name)
+            super(DrawClassifyModel3d, self).get_dim(name)
 
     # ------------------------------------------------------------------------
 
@@ -272,10 +273,10 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         # c = c + cc
         # y = self.decoder_mlp.apply(c)
 
-        rr, center_y, center_x = self.reader.apply(x, c)
+        rr, center_x, center_y, center_z = self.reader.apply(x, c)
         r = r + rr # combine revealed images
         batch_size = r.shape[0]
-        c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,28,28)))
+        c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,32,32,32)))
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 

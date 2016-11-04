@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from cnn3d_bricks import Convolutional3, ConvolutionalTranspose3, Pooling3, MaxPooling3, AveragePooling3, ConvolutionalSequence3, Flattener3
+from cnn3d_bricks import Convolutional3, MaxPooling3, ConvolutionalSequence3, Flattener3
 
 
 
@@ -28,7 +28,6 @@ from blocks.extensions.monitoring import (DataStreamMonitoring,
                                           TrainingDataMonitoring)
 from blocks.extensions.saveload import Checkpoint
 from blocks.graph import ComputationGraph
-from blocks.initialization import Constant, Uniform
 from blocks.main_loop import MainLoop
 from blocks.model import Model
 from blocks.monitoring import aggregation
@@ -37,7 +36,8 @@ from fuel.streams import DataStream
 from fuel.datasets.hdf5 import H5PYDataset
 from toolz.itertoolz import interleave
 import theano.tensor as T
-from blocks.initialization import Constant, Uniform, IsotropicGaussian
+from blocks.initialization import Constant, Uniform
+
 theano.config.floatX = 'float32'
 floatX = theano.config.floatX
 

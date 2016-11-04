@@ -1,4 +1,4 @@
-# MAX: simple RNN model w/o VAE
+# Hope: simple RNN model w/o VAE in 3D
 
 
 
@@ -7,7 +7,6 @@
 from __future__ import division, print_function
 
 import logging
-import numpy as np
 
 FORMAT = '[%(asctime)s] %(name)-15s %(message)s'
 DATEFMT = "%H:%M:%S"
@@ -15,36 +14,22 @@ logging.basicConfig(format=FORMAT, datefmt=DATEFMT, level=logging.INFO)
 
 import os
 import theano
-import theano.tensor as T
-import fuel
-import ipdb
 import time
-import cPickle as pickle
 
 from argparse import ArgumentParser
-from theano import tensor
 
-from fuel.streams import DataStream
 from fuel.schemes import SequentialScheme
 from fuel.transformers import Flatten
 
-from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum, Scale
-from blocks.bricks import Tanh, Identity
-from blocks.bricks.cost import BinaryCrossEntropy, CategoricalCrossEntropy, MisclassificationRate
-from blocks.bricks.conv import Convolutional, ConvolutionalSequence
-from blocks.bricks.recurrent import SimpleRecurrent, LSTM
-from blocks.initialization import Constant, IsotropicGaussian, Orthogonal
-from blocks.filter import VariableFilter
-from blocks.graph import ComputationGraph
-from blocks.roles import PARAMETER
-from blocks.monitoring import aggregation
-from blocks.extensions import FinishAfter, Timing, Printing, ProgressBar
-from blocks.extensions.saveload import Checkpoint
-from blocks.extensions.monitoring import DataStreamMonitoring, TrainingDataMonitoring
-from blocks.main_loop import MainLoop
-from blocks.model import Model
+from blocks.algorithms import Scale
+from blocks.bricks.cost import CategoricalCrossEntropy, MisclassificationRate
 from blocks.serialization import load
 from fuel.datasets.hdf5 import H5PYDataset
+from fuel.streams import DataStream
+
+theano.config.floatX = 'float32'
+floatX = theano.config.floatX
+
 
 
 try:
@@ -52,9 +37,7 @@ try:
 except ImportError:
     pass
 
-import draw.datasets as datasets
-from draw.draw_classify_simple import *
-from draw.samplecheckpoint import SampleCheckpoint
+from draw_classify_simple_3d import *
 
 sys.setrecursionlimit(100000)
 
@@ -63,24 +46,25 @@ sys.setrecursionlimit(100000)
 
 def main(name, dataset, epochs, batch_size, learning_rate, attention,
          n_iter, rnn_dim, y_dim, oldmodel, live_plotting):
-    image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
+
+    # image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
+    image_size = (32,32,32)
+    channels = 1
+    train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
 
     train_stream = Flatten(
-        DataStream.default_stream(data_train, iteration_scheme=SequentialScheme(data_train.num_examples, batch_size)))
-    valid_stream = Flatten(
-        DataStream.default_stream(data_valid, iteration_scheme=SequentialScheme(data_valid.num_examples, batch_size)))
+        DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(train_set.num_examples, batch_size)))
     test_stream = Flatten(
-        DataStream.default_stream(data_test, iteration_scheme=SequentialScheme(data_test.num_examples, batch_size)))
+        DataStream.default_stream(test_set, iteration_scheme=SequentialScheme(test_set.num_examples, batch_size)))
 
 
-    train_set = H5PYDataset('shapenet10.hdf5', which_sets=('train',))
-    train_set_stream = DataStream.default_stream(
-        train_set, iteration_scheme=ShuffledScheme(
-            train_set.num_examples, batch_size))
-    test_set = H5PYDataset('shapenet10.hdf5', which_sets=('test',))
-    test_set_stream = DataStream.default_stream(
-        test_set, iteration_scheme=ShuffledScheme(
-            test_set.num_examples, batch_size))
+    # train_stream = DataStream.default_stream(
+    #     train_set, iteration_scheme=ShuffledScheme(
+    #         train_set.num_examples, batch_size))
+    # test_stream = DataStream.default_stream(
+    #     test_set, iteration_scheme=ShuffledScheme(
+    #         test_set.num_examples, batch_size))
 
 
     if name is None:
@@ -119,8 +103,9 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     print()
 
     # ----------------------------------------------------------------------
+    from draw_classify_simple_3d import DrawClassifyModel3d
 
-    draw = DrawClassifyModel(image_size=image_size, channels=channels, attention=attention)
+    draw = DrawClassifyModel3d(image_size=image_size, channels=channels, attention=attention)
     draw.push_initialization_config()
     draw.conv_sequence.layers[0].weights_init = Uniform(width=.2)
     draw.conv_sequence.layers[1].weights_init = Uniform(width=.09)
@@ -129,8 +114,11 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     draw.initialize()
 
     # ------------------------------------------------------------------------
-    x = tensor.matrix('features') # keyword from fuel
+    x = tensor.matrix('input') # keyword from fuel
     y = tensor.matrix('targets') # keyword from fuel
+    # dtensor5 = T.TensorType(floatX, (False,) * 5)
+    # x = dtensor5(name='input')
+    # y = tensor.lmatrix('targets')
 
     y_hat, _, _, _, _ = draw.classify(x)
 
@@ -287,10 +275,10 @@ if __name__ == "__main__":
                         default=100, help="Size of each mini-batch")
     parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",
                         default=1e-3, help="Learning rate")
-    parser.add_argument("--attention", "-a", type=str, default="",
-                        help="Use attention mechanism (read_window)")
+    parser.add_argument("--attention", "-a", type=str,
+                        default=5, help="Use attention mechanism (read_window)")
     parser.add_argument("--niter", type=int, dest="n_iter",
-                        default=16, help="No. of iterations")
+                        default=4, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",
                         default=256, help="Encoder RNN state dimension") # originally 256
     parser.add_argument("--y-dim", type=int, dest="y_dim",

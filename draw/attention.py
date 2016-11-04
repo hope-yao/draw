@@ -8,7 +8,7 @@ import theano
 import theano.tensor as T
 
 from theano import tensor
-
+from theano.compile.sharedvalue import shared
 floatX = theano.config.floatX
 
 #-----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ class ZoomableAttentionWindow(object):
 
     def filterbank_matrices(self, center_y, center_x, delta, sigma):
         """Create a Fy and a Fx
-        
+
         Parameters
         ----------
         center_y : T.vector (shape: batch_size)
@@ -58,7 +58,7 @@ class ZoomableAttentionWindow(object):
             Y and X center coordinates for the attention window
         delta : T.vector (shape: batch_size)
         sigma : T.vector (shape: batch_size)
-        
+
         Returns
         -------
             FY : T.fvector (shape: )
@@ -74,7 +74,7 @@ class ZoomableAttentionWindow(object):
 
         a = tensor.arange(self.img_width, dtype=floatX)
         b = tensor.arange(self.img_height, dtype=floatX)
-        
+
         FX = tensor.exp( -(a-muX.dimshuffle([0,1,'x']))**2 / 2. / sigma.dimshuffle([0,'x','x'])**2 )
         FY = tensor.exp( -(b-muY.dimshuffle([0,1,'x']))**2 / 2. / sigma.dimshuffle([0,'x','x'])**2 )
         FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
@@ -107,8 +107,8 @@ class ZoomableAttentionWindow(object):
 
         Parameters
         ----------
-        images : :class:`~tensor.TensorVariable`    
-            Batch of images with shape (batch_size x img_size). Internally it 
+        images : :class:`~tensor.TensorVariable`
+            Batch of images with shape (batch_size x img_size). Internally it
             will be reshaped to a (batch_size, img_height, img_width)-shaped
             stack of images.
         center_y : :class:`~tensor.TensorVariable`
@@ -183,8 +183,8 @@ class ZoomableAttentionWindow(object):
 
         Parameters
         ----------
-        windows : :class:`~tensor.TensorVariable`    
-            Batch of images with shape (batch_size x N*N). Internally it 
+        windows : :class:`~tensor.TensorVariable`
+            Batch of images with shape (batch_size x N*N). Internally it
             will be reshaped to a (batch_size, N, N)-shaped
             stack of images.
         center_y : :class:`~tensor.TensorVariable`
@@ -259,35 +259,35 @@ class ZoomableAttentionWindow(object):
 
     def nn2att(self, l):
         """Convert neural-net outputs to attention parameters
-    
+
         Parameters
         ----------
         layer : :class:`~tensor.TensorVariable`
             A batch of neural net outputs with shape (batch_size x 5)
-    
+
         Returns
         -------
-        center_y : :class:`~tensor.TensorVariable` 
-        center_x : :class:`~tensor.TensorVariable` 
-        delta : :class:`~tensor.TensorVariable` 
-        sigma : :class:`~tensor.TensorVariable` 
-        gamma : :class:`~tensor.TensorVariable` 
+        center_y : :class:`~tensor.TensorVariable`
+        center_x : :class:`~tensor.TensorVariable`
+        delta : :class:`~tensor.TensorVariable`
+        sigma : :class:`~tensor.TensorVariable`
+        gamma : :class:`~tensor.TensorVariable`
         """
         center_y  = l[:,0]
         center_x  = l[:,1]
         log_delta = l[:,2]
         log_sigma = l[:,3]
         log_gamma = l[:,4]
-    
+
         delta = T.exp(log_delta)
         sigma = T.exp(log_sigma/2.)
         gamma = T.exp(log_gamma).dimshuffle(0, 'x')
-    
+
         # normalize coordinates
         center_x = (center_x+1.)/2. * self.img_width
         center_y = (center_y+1.)/2. * self.img_height
         delta = (max(self.img_width, self.img_height)-1) / (self.N-1) * delta
-    
+
         return center_y, center_x, delta, sigma, gamma
 
     def nn2att_const_gamma(self, l):
@@ -320,6 +320,299 @@ class ZoomableAttentionWindow(object):
         # delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
 
         return center_y, center_x
+
+    # -----------------------------------------------------------------------------
+
+class ZoomableAttentionWindow3d(object):
+        def __init__(self, channels, img_height, img_width, img_depth, N):
+            """A zoomable attention window for images.
+
+            Parameters
+            ----------
+            channels : int
+            img_heigt, img_width : int
+                shape of the images
+            N :
+                $N \times N$ attention window size
+            """
+            self.channels = channels
+            self.img_height = img_height
+            self.img_width = img_width
+            self.img_depth = img_depth
+            self.N = N
+
+        def filterbank_matrices(self, center_x, center_y, center_z, delta, sigma):
+            """Create a Fy and a Fx
+
+            Parameters
+            ----------
+            center_y : T.vector (shape: batch_size)
+            center_x : T.vector (shape: batch_size)
+                Y and X center coordinates for the attention window
+            delta : T.vector (shape: batch_size)
+            sigma : T.vector (shape: batch_size)
+
+            Returns
+            -------
+                FY : T.fvector (shape: )
+                FX : T.fvector (shape: )
+            """
+            tol = 1e-4
+            N = self.N
+
+            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+
+            muX = center_x.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
+            muY = center_y.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
+
+            a = tensor.arange(self.img_width, dtype=floatX)
+            b = tensor.arange(self.img_height, dtype=floatX)
+
+            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+
+            return FY, FX
+
+        def filterbank_matrices_constant_gamma(self, center_y, center_x):
+            tol = 1e-4
+            N = self.N
+
+            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+
+            muX = center_x.dimshuffle([0, 'x'])
+            muY = center_y.dimshuffle([0, 'x'])
+
+            a = tensor.arange(self.img_width, dtype=floatX)
+            b = tensor.arange(self.img_height, dtype=floatX)
+
+            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2.)
+            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2.)
+            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+
+            return FY, FX
+
+        def read(self, images, center_y, center_x, delta, sigma):
+            """Extract a batch of attention windows from the given images.
+
+            Parameters
+            ----------
+            images : :class:`~tensor.TensorVariable`
+                Batch of images with shape (batch_size x img_size). Internally it
+                will be reshaped to a (batch_size, img_height, img_width)-shaped
+                stack of images.
+            center_y : :class:`~tensor.TensorVariable`
+                Center coordinates for the attention window.
+                Expected shape: (batch_size,)
+            center_x : :class:`~tensor.TensorVariable`
+                Center coordinates for the attention window.
+                Expected shape: (batch_size,)
+            delta : :class:`~tensor.TensorVariable`
+                Distance between extracted grid points.
+                Expected shape: (batch_size,)
+            sigma : :class:`~tensor.TensorVariable`
+                Std. dev. for Gaussian readout kernel.
+                Expected shape: (batch_size,)
+
+            Returns
+            -------
+            windows : :class:`~tensor.TensorVariable`
+                extracted windows of shape: (batch_size x N**2)
+            """
+            N = self.N
+            channels = self.channels
+            batch_size = images.shape[0]
+
+            # Reshape input into proper 2d images
+            I = images.reshape((batch_size * channels, self.img_height, self.img_width))
+
+            # Get separable filterbank
+            FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+
+            FY = T.repeat(FY, channels, axis=0)
+            FX = T.repeat(FX, channels, axis=0)
+
+            # apply to the batch of images
+            W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
+
+            return W.reshape((batch_size, channels, N, N))
+
+        def read_large(self, images, center_x, center_y, center_z, N):
+            N = self.N
+            channels = self.channels
+            batch_size = images.shape[0]
+
+            # delta = T.cast(theano.shared(np.ones(100)), 'float32')
+            # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
+
+            # Reshape input into proper 2d images
+            I = images.reshape((batch_size * channels, self.img_height, self.img_width, self.img_depth))
+
+            # Hope: get 3D gaussian filter, with truncation at the boundary of the filter
+            Fnp = tensor.zeros((self.img_height, self.img_width, self.img_depth))
+            sigma = 1
+            for posx in tensor.arange(center_x - N / 2, center_x + N / 2 + 1):
+                for posy in tensor.arange(center_y - N / 2, center_y + N / 2 + 1):
+                    for posz in tensor.arange(center_z - N / 2, center_z + N / 2 + 1):
+                        Fnp[posx,posy,posz] = tensor.TensorConstant(1.0)
+            F = shared(Fnp)
+            F = T.repeat(F, batch_size *channels, axis=0)
+
+            # for posx in range(self.img_width):
+            #     for posy in range(self.img_height):
+            #         for posz in range(self.img_depth):
+            #             sqr_dis = ((center_x-posx)**2+(center_y-posy)**2+(center_z-posz)**2)
+            #             F[posx,posy,posz] = tensor.exp(-sqr_dis/ 2. / sigma ** 2)
+            #             tol = 1e-4
+            # F = F / (F.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+
+
+
+            return F.reshape((batch_size, channels * self.img_height * self.img_width))
+
+            # return W.reshape((batch_size, channels*N*N))
+
+        def write(self, windows, center_y, center_x, delta, sigma):
+            """Write a batch of windows into full sized images.
+
+            Parameters
+            ----------
+            windows : :class:`~tensor.TensorVariable`
+                Batch of images with shape (batch_size x N*N). Internally it
+                will be reshaped to a (batch_size, N, N)-shaped
+                stack of images.
+            center_y : :class:`~tensor.TensorVariable`
+                Center coordinates for the attention window.
+                Expected shape: (batch_size,)
+            center_x : :class:`~tensor.TensorVariable`
+                Center coordinates for the attention window.
+                Expected shape: (batch_size,)
+            delta : :class:`~tensor.TensorVariable`
+                Distance between extracted grid points.
+                Expected shape: (batch_size,)
+            sigma : :class:`~tensor.TensorVariable`
+                Std. dev. for Gaussian readout kernel.
+                Expected shape: (batch_size,)
+
+            Returns
+            -------
+            images : :class:`~tensor.TensorVariable`
+                extracted windows of shape: (batch_size x img_height*img_width)
+            """
+            N = self.N
+            channels = self.channels
+            batch_size = windows.shape[0]
+
+            # Reshape input into proper 2d windows
+            W = windows.reshape((batch_size * channels, N, N))
+
+            # Get separable filterbank
+            FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+
+            FY = T.repeat(FY, channels, axis=0)
+            FX = T.repeat(FX, channels, axis=0)
+
+            # apply...
+            I = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+
+            return I.reshape((batch_size, channels * self.img_height * self.img_width))
+
+        # Max hack
+        def write_small(self, windows, center_y, center_x, sigma):
+            N = self.N
+            channels = self.channels
+            batch_size = windows.shape[0]
+            # Reshape input into proper 2d windows
+            W = windows.reshape((batch_size * channels, N, N))
+            # Get separable filterbank
+            FY, FX = self.filterbank_matrices_small(center_y, center_x, sigma)
+            FY = T.repeat(FY, channels, axis=0)
+            FX = T.repeat(FX, channels, axis=0)
+            # apply...
+            I = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+            return I.reshape((batch_size, channels * self.img_height * self.img_width))
+
+        def filterbank_matrices_small(self, center_y, center_x, sigma):
+            tol = 1e-4
+            N = self.N
+            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+            muX = center_x.dimshuffle([0, 'x']) + rng
+            muY = center_y.dimshuffle([0, 'x']) + rng
+            a = tensor.arange(self.img_width, dtype=floatX)
+            b = tensor.arange(self.img_height, dtype=floatX)
+            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            return FY, FX
+
+        def nn2att(self, l):
+            """Convert neural-net outputs to attention parameters
+
+            Parameters
+            ----------
+            layer : :class:`~tensor.TensorVariable`
+                A batch of neural net outputs with shape (batch_size x 5)
+
+            Returns
+            -------
+            center_y : :class:`~tensor.TensorVariable`
+            center_x : :class:`~tensor.TensorVariable`
+            delta : :class:`~tensor.TensorVariable`
+            sigma : :class:`~tensor.TensorVariable`
+            gamma : :class:`~tensor.TensorVariable`
+            """
+            center_y = l[:, 0]
+            center_x = l[:, 1]
+            log_delta = l[:, 2]
+            log_sigma = l[:, 3]
+            log_gamma = l[:, 4]
+
+            delta = T.exp(log_delta)
+            sigma = T.exp(log_sigma / 2.)
+            gamma = T.exp(log_gamma).dimshuffle(0, 'x')
+
+            # normalize coordinates
+            center_x = (center_x + 1.) / 2. * self.img_width
+            center_y = (center_y + 1.) / 2. * self.img_height
+            delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
+
+            return center_y, center_x, delta, sigma, gamma
+
+        def nn2att_const_gamma(self, l):
+            """Convert neural-net outputs to attention parameters
+
+            Parameters
+            ----------
+            layer : :class:`~tensor.TensorVariable`
+                A batch of neural net outputs with shape (batch_size x 5)
+
+            Returns
+            -------
+            center_y : :class:`~tensor.TensorVariable`
+            center_x : :class:`~tensor.TensorVariable`
+            delta : :class:`~tensor.TensorVariable`
+            sigma : :class:`~tensor.TensorVariable`
+            gamma : :class:`~tensor.TensorVariable`
+            """
+            center_x = l[:, 0]
+            center_y = l[:, 1]
+            center_z = l[:, 2]
+            # log_delta = l[:, 2]
+            # log_sigma = l[:, 3]
+
+            # delta = T.exp(log_delta)
+            # sigma = T.exp(log_sigma / 2.)
+
+            # normalize coordinates
+            center_x = (center_x + 1.) / 2. * self.img_width
+            center_y = (center_y + 1.) / 2. * self.img_height
+            center_z = (center_z + 1.) / 2. * self.img_depth
+            # delta = (max(self.img_width, self.img_height) - 1) / (self.N - 1) * delta
+
+            return center_x, center_y, center_z
 
 
 #=============================================================================
