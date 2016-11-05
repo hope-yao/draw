@@ -120,7 +120,7 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     # x = dtensor5(name='input')
     # y = tensor.lmatrix('targets')
 
-    y_hat, _, _, _, _ = draw.classify(x)
+    y_hat, _, _, _, _, _ = draw.classify(x)
 
     y_hat_last = y_hat[-1,:,:] # output should be batch_size * class
     # y_hat_last = y_hat
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--attention", "-a", type=str,
                         default=5, help="Use attention mechanism (read_window)")
     parser.add_argument("--niter", type=int, dest="n_iter",
-                        default=4, help="No. of iterations")
+                        default=1, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",
                         default=256, help="Encoder RNN state dimension") # originally 256
     parser.add_argument("--y-dim", type=int, dest="y_dim",

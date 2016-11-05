@@ -341,40 +341,6 @@ class ZoomableAttentionWindow3d(object):
             self.img_depth = img_depth
             self.N = N
 
-        def filterbank_matrices(self, center_x, center_y, center_z, delta, sigma):
-            """Create a Fy and a Fx
-
-            Parameters
-            ----------
-            center_y : T.vector (shape: batch_size)
-            center_x : T.vector (shape: batch_size)
-                Y and X center coordinates for the attention window
-            delta : T.vector (shape: batch_size)
-            sigma : T.vector (shape: batch_size)
-
-            Returns
-            -------
-                FY : T.fvector (shape: )
-                FX : T.fvector (shape: )
-            """
-            tol = 1e-4
-            N = self.N
-
-            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
-
-            muX = center_x.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
-            muY = center_y.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
-
-            a = tensor.arange(self.img_width, dtype=floatX)
-            b = tensor.arange(self.img_height, dtype=floatX)
-
-            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
-            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
-            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
-            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
-
-            return FY, FX
-
         def filterbank_matrices_constant_gamma(self, center_y, center_x):
             tol = 1e-4
             N = self.N
@@ -439,7 +405,7 @@ class ZoomableAttentionWindow3d(object):
 
             return W.reshape((batch_size, channels, N, N))
 
-        def read_large(self, images, center_x, center_y, center_z, N):
+        def read_large(self, images, center_x, center_y, center_z):
             N = self.N
             channels = self.channels
             batch_size = images.shape[0]
@@ -451,28 +417,104 @@ class ZoomableAttentionWindow3d(object):
             I = images.reshape((batch_size * channels, self.img_height, self.img_width, self.img_depth))
 
             # Hope: get 3D gaussian filter, with truncation at the boundary of the filter
-            Fnp = tensor.zeros((self.img_height, self.img_width, self.img_depth))
-            sigma = 1
-            for posx in tensor.arange(center_x - N / 2, center_x + N / 2 + 1):
-                for posy in tensor.arange(center_y - N / 2, center_y + N / 2 + 1):
-                    for posz in tensor.arange(center_z - N / 2, center_z + N / 2 + 1):
-                        Fnp[posx,posy,posz] = tensor.TensorConstant(1.0)
-            F = shared(Fnp)
-            F = T.repeat(F, batch_size *channels, axis=0)
+            F = tensor.zeros((self.img_height, self.img_width, self.img_depth))
+            cx = T.cast(center_x[0]*self.img_height, 'int64')
+            cy = T.cast(center_y[0]*self.img_width, 'int64')
+            cz = T.cast(center_z[0]*self.img_depth, 'int64')
+            if 0:
+                posx = tensor.arange( T.cast(cx - N / 2, 'int64'),  T.cast(cx + N / 2 + 1, 'int64'))
+                posy = tensor.arange( T.cast(cy - N / 2, 'int64'),  T.cast(cy + N / 2 + 1, 'int64'))
+                posz = tensor.arange( T.cast(cz - N / 2, 'int64'),  T.cast(cz + N / 2 + 1, 'int64'))
+                F = tensor.inc_subtensor(F[posx,posy,posz], 1)
+                F = T.repeat(F, batch_size *channels, axis=0)
+                return F.reshape((batch_size, channels * self.img_height * self.img_width))
+            else:
+                posx = tensor.arange( 0, self.img_height )
+                posy = tensor.arange( 0, self.img_width )
+                posz = tensor.arange( 0, self.img_depth )
+                for posx in range(self.img_height):
+                    for posy in range(self.img_width):
+                        for posz in range(self.img_depth):
+                            sqr_dis = (cx-posx)**2+(cy-posy)**2+(cz-posz)**2
+                            sigma = 1.0
+                            vinc = tensor.exp(-sqr_dis/ 2. / sigma ** 2)
+                            F = tensor.inc_subtensor(F[posx,posy,posz],vinc)
+                # tol = 1e-4
+                # F = F / (F.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+                return F
 
-            # for posx in range(self.img_width):
-            #     for posy in range(self.img_height):
-            #         for posz in range(self.img_depth):
-            #             sqr_dis = ((center_x-posx)**2+(center_y-posy)**2+(center_z-posz)**2)
-            #             F[posx,posy,posz] = tensor.exp(-sqr_dis/ 2. / sigma ** 2)
-            #             tol = 1e-4
-            # F = F / (F.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
 
 
 
-            return F.reshape((batch_size, channels * self.img_height * self.img_width))
+        def filterbank_matrices(self, center_y, center_x, delta, sigma):
+            """Create a Fy and a Fx
 
-            # return W.reshape((batch_size, channels*N*N))
+            Parameters
+            ----------
+            center_y : T.vector (shape: batch_size)
+            center_x : T.vector (shape: batch_size)
+                Y and X center coordinates for the attention window
+            delta : T.vector (shape: batch_size)
+            sigma : T.vector (shape: batch_size)
+
+            Returns
+            -------
+                FY : T.fvector (shape: )
+                FX : T.fvector (shape: )
+            """
+            tol = 1e-4
+            N = self.N
+
+            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
+
+            muX = center_x.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
+            muY = center_y.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
+
+            a = tensor.arange(self.img_width, dtype=floatX)
+            b = tensor.arange(self.img_height, dtype=floatX)
+
+            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+
+            return FY, FX
+
+        # def read_large(self, images, center_y, center_x, center_z):
+        #     N = self.N
+        #     channels = self.img_depth
+        #     batch_size = images.shape[0]
+        #
+        #
+        #     # delta = T.cast(theano.shared(np.ones(100)), 'float32')
+        #     # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
+        #     delta = T.ones([batch_size], 'float32')
+        #     sigma = T.ones([batch_size], 'float32')
+        #
+        #     # Reshape input into proper 3d images
+        #     I = images.reshape((batch_size, self.channels, self.img_height, self.img_width, self.img_depth))
+        #     I = I.dimshuffle([0, 4, 2, 3, 1, 'x'])
+        #     I = I.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
+        #
+        #     # Get separable filterbank
+        #     FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+        #
+        #     FY = T.repeat(FY, channels, axis=0)
+        #     FX = T.repeat(FX, channels, axis=0)
+        #
+        #     # apply to the batch of images
+        #     W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
+        #     W = W.reshape((batch_size * channels, N, N))
+        #
+        #     # Max hack: convert back to an image
+        #     II = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+        #
+        #     II = II.reshape((batch_size, channels, self.img_height, self.img_width, self.channels))
+        #     II = II.dimshuffle([0, 4, 2, 3, 1, 'x'])
+        #
+        #     return II
+        #
+        #     # return W.reshape((batch_size, channels*N*N))
 
         def write(self, windows, center_y, center_x, delta, sigma):
             """Write a batch of windows into full sized images.

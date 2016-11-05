@@ -86,13 +86,13 @@ class AttentionReader3d(Initializable):
         else:
             raise ValueError
 
-    @application(inputs=['x', 'c'], outputs=['r', 'cx', 'cy'])
+    @application(inputs=['x', 'c'], outputs=['r', 'cx', 'cy', 'cz'])
     def apply(self, x, c):
         l = self.readout.apply(c)
 
         center_x, center_y , center_z = self.zoomer.nn2att_const_gamma(l)
 
-        r = self.zoomer.read_large(x, center_x, center_y, center_z, self.N)
+        r = self.zoomer.read_large(x, center_x, center_y, center_z)
 
         return r, center_x, center_y, center_z
 
@@ -251,6 +251,8 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
             return 1
         elif name == 'center_x':
             return 1
+        elif name == 'center_z':
+            return 1
         elif name == 'delta':
             return 1
         else:
@@ -260,7 +262,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
 
     @recurrent(sequences=['dummy'], contexts=['x'],
                states=['r', 'c'],
-               outputs=['y', 'r', 'c', 'cx', 'cy'])
+               outputs=['y', 'r', 'c', 'cx', 'cy', 'cz'])
     def apply(self, c, r, x, dummy):
         # r, cx, cy, delta, sigma = self.reader.apply(x, c)
         # a = self.encoder_conv.apply(r)
@@ -280,11 +282,11 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 
-        return y, r, c, center_x, center_y
+        return y, r, c, center_x, center_y, center_z
 
     # ------------------------------------------------------------------------
 
-    @application(inputs=['features'], outputs=['targets', 'r', 'c', 'cx', 'cy'])
+    @application(inputs=['features'], outputs=['targets', 'r', 'c', 'cx', 'cy', 'cz'])
     def classify(self, features):
         batch_size = features.shape[0]
         # Sample from mean-zeros std.-one Gaussian
@@ -293,6 +295,6 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
             avg=0., std=1.)
 
         # y, r, c, center_x, center_y, delta, sigma = self.apply(x=features, dummy=u)
-        y, r, c, cx, cy = self.apply(x=features, dummy=u)
+        y, r, c, cx, cy, cz = self.apply(x=features, dummy=u)
 
-        return y, r, c, cx, cy
+        return y, r, c, cx, cy, cz
