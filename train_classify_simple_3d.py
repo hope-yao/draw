@@ -276,7 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",
                         default=1e-3, help="Learning rate")
     parser.add_argument("--attention", "-a", type=str,
-                        default=5, help="Use attention mechanism (read_window)")
+                        default=3, help="Use attention mechanism (read_window)")
     parser.add_argument("--niter", type=int, dest="n_iter",
                         default=1, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",

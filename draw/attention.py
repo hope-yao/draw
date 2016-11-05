@@ -25,7 +25,8 @@ def my_batched_dot(A, B):
     Returns        
     -------        
         C : shape (dim_1 \times dim_2 \times dim_4)        
-    """        
+    """
+    print(A.ndim, B.ndim)
     C = A.dimshuffle([0,1,2,'x']) * B.dimshuffle([0,'x',1,2])      
     return C.sum(axis=-2)
 
@@ -404,46 +405,43 @@ class ZoomableAttentionWindow3d(object):
             W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
 
             return W.reshape((batch_size, channels, N, N))
-
-        def read_large(self, images, center_x, center_y, center_z):
-            N = self.N
-            channels = self.channels
-            batch_size = images.shape[0]
-
-            # delta = T.cast(theano.shared(np.ones(100)), 'float32')
-            # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
-
-            # Reshape input into proper 2d images
-            I = images.reshape((batch_size * channels, self.img_height, self.img_width, self.img_depth))
-
-            # Hope: get 3D gaussian filter, with truncation at the boundary of the filter
-            F = tensor.zeros((self.img_height, self.img_width, self.img_depth))
-            cx = T.cast(center_x[0]*self.img_height, 'int64')
-            cy = T.cast(center_y[0]*self.img_width, 'int64')
-            cz = T.cast(center_z[0]*self.img_depth, 'int64')
-            if 0:
-                posx = tensor.arange( T.cast(cx - N / 2, 'int64'),  T.cast(cx + N / 2 + 1, 'int64'))
-                posy = tensor.arange( T.cast(cy - N / 2, 'int64'),  T.cast(cy + N / 2 + 1, 'int64'))
-                posz = tensor.arange( T.cast(cz - N / 2, 'int64'),  T.cast(cz + N / 2 + 1, 'int64'))
-                F = tensor.inc_subtensor(F[posx,posy,posz], 1)
-                F = T.repeat(F, batch_size *channels, axis=0)
-                return F.reshape((batch_size, channels * self.img_height * self.img_width))
-            else:
-                posx = tensor.arange( 0, self.img_height )
-                posy = tensor.arange( 0, self.img_width )
-                posz = tensor.arange( 0, self.img_depth )
-                for posx in range(self.img_height):
-                    for posy in range(self.img_width):
-                        for posz in range(self.img_depth):
-                            sqr_dis = (cx-posx)**2+(cy-posy)**2+(cz-posz)**2
-                            sigma = 1.0
-                            vinc = tensor.exp(-sqr_dis/ 2. / sigma ** 2)
-                            F = tensor.inc_subtensor(F[posx,posy,posz],vinc)
-                # tol = 1e-4
-                # F = F / (F.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
-                return F
-
-
+        #
+        # def read_large(self, images, center_x, center_y, center_z):
+        #     N = self.N
+        #     channels = self.channels
+        #     batch_size = images.shape[0]
+        #
+        #     # Hope: get 3D gaussian filter, with truncation at the boundary of the filter
+        #     F = tensor.zeros((self.img_height, self.img_width, self.img_depth))
+        #     cx = T.cast(center_x[0]*self.img_height, 'int64')
+        #     cy = T.cast(center_y[0]*self.img_width, 'int64')
+        #     cz = T.cast(center_z[0]*self.img_depth, 'int64')
+        #     if 0:
+        #         posx = tensor.arange( T.cast(cx - N / 2, 'int64'),  T.cast(cx + N / 2 + 1, 'int64'))
+        #         posy = tensor.arange( T.cast(cy - N / 2, 'int64'),  T.cast(cy + N / 2 + 1, 'int64'))
+        #         posz = tensor.arange( T.cast(cz - N / 2, 'int64'),  T.cast(cz + N / 2 + 1, 'int64'))
+        #         F = tensor.inc_subtensor(F[posx,posy,posz], 1)
+        #         F = T.repeat(F, batch_size *channels, axis=0)
+        #         return F.reshape((batch_size, channels * self.img_height * self.img_width))
+        #     else:
+        #         # posx = tensor.arange( 0, self.img_height )
+        #         # posy = tensor.arange( 0, self.img_width )
+        #         # posz = tensor.arange( 0, self.img_depth )
+        #         # for posx in range(self.img_height):
+        #         #     for posy in range(self.img_width):
+        #         #         for posz in range(self.img_depth):
+        #         #             sqr_dis = (cx-posx)**2+(cy-posy)**2+(cz-posz)**2
+        #         #             sigma = 1.0
+        #         #             vinc = tensor.exp(-sqr_dis/ 2. / sigma ** 2)
+        #         #             F = tensor.inc_subtensor(F[posx,posy,posz],vinc)
+        #         # tol = 1e-4
+        #         # F = F / (F.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+        #         # FF = T.repeat(F, batch_size, axis=0)
+        #         # FF = FF.reshape((batch_size, channels*self.img_depth*self.img_height*self.img_width))
+        #         FF = tensor.ones((batch_size, channels*self.img_depth*self.img_height*self.img_width))*center_x
+        #         return FF
+        #
+        #
 
 
         def filterbank_matrices(self, center_y, center_x, delta, sigma):
@@ -480,41 +478,41 @@ class ZoomableAttentionWindow3d(object):
 
             return FY, FX
 
-        # def read_large(self, images, center_y, center_x, center_z):
-        #     N = self.N
-        #     channels = self.img_depth
-        #     batch_size = images.shape[0]
-        #
-        #
-        #     # delta = T.cast(theano.shared(np.ones(100)), 'float32')
-        #     # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
-        #     delta = T.ones([batch_size], 'float32')
-        #     sigma = T.ones([batch_size], 'float32')
-        #
-        #     # Reshape input into proper 3d images
-        #     I = images.reshape((batch_size, self.channels, self.img_height, self.img_width, self.img_depth))
-        #     I = I.dimshuffle([0, 4, 2, 3, 1, 'x'])
-        #     I = I.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
-        #
-        #     # Get separable filterbank
-        #     FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
-        #
-        #     FY = T.repeat(FY, channels, axis=0)
-        #     FX = T.repeat(FX, channels, axis=0)
-        #
-        #     # apply to the batch of images
-        #     W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
-        #     W = W.reshape((batch_size * channels, N, N))
-        #
-        #     # Max hack: convert back to an image
-        #     II = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
-        #
-        #     II = II.reshape((batch_size, channels, self.img_height, self.img_width, self.channels))
-        #     II = II.dimshuffle([0, 4, 2, 3, 1, 'x'])
-        #
-        #     return II
-        #
-        #     # return W.reshape((batch_size, channels*N*N))
+        def read_large(self, images, center_y, center_x, center_z):
+            N = self.N
+            channels = self.channels
+            batch_size = images.shape[0]
+            print(images.ndim)
+
+            # delta = T.cast(theano.shared(np.ones(100)), 'float32')
+            # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
+            delta = T.ones([batch_size], 'float32')
+            sigma = T.ones([batch_size], 'float32')
+
+            # Reshape input into proper 3d images
+            I = images.reshape((batch_size, self.channels, self.img_height, self.img_width, self.img_depth))
+            I = I.dimshuffle([0, 4, 2, 3, 1])
+            I = I.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
+
+            # Get separable filterbank
+            FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+
+            FY = T.repeat(FY, self.img_depth, axis=0)
+            FX = T.repeat(FX, self.img_depth, axis=0)
+
+            # apply to the batch of images
+            W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
+            W = W.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
+
+            # Max hack: convert back to an image
+            II = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+
+            II = II.reshape((batch_size, self.img_depth, self.img_height, self.img_width, channels))
+            II = II.dimshuffle([0, 4, 2, 3, 1])
+
+            return II.reshape((batch_size, self.img_height*self.img_width*self.img_depth*channels))
+
+            # return W.reshape((batch_size, channels*N*N))
 
         def write(self, windows, center_y, center_x, delta, sigma):
             """Write a batch of windows into full sized images.
