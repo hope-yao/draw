@@ -26,8 +26,8 @@ def my_batched_dot(A, B):
     -------        
         C : shape (dim_1 \times dim_2 \times dim_4)        
     """
-    print(A.ndim, B.ndim)
-    C = A.dimshuffle([0,1,2,'x']) * B.dimshuffle([0,'x',1,2])      
+    print(A.shape, B.shape)
+    C = A.dimshuffle([0,1,2,'x']) * B.dimshuffle([0,'x',1,2])
     return C.sum(axis=-2)
 
 #-----------------------------------------------------------------------------
@@ -490,8 +490,8 @@ class ZoomableAttentionWindow3d(object):
             sigma = T.ones([batch_size], 'float32')
 
             # Reshape input into proper 3d images
-            I = images.reshape((batch_size, self.channels, self.img_height, self.img_width, self.img_depth))
-            I = I.dimshuffle([0, 4, 2, 3, 1])
+            I = images.reshape((batch_size, self.img_height, self.img_width, self.img_depth))
+            I = I.dimshuffle([0, 2, 3, 1])
             I = I.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
 
             # Get separable filterbank
@@ -500,16 +500,22 @@ class ZoomableAttentionWindow3d(object):
             FY = T.repeat(FY, self.img_depth, axis=0)
             FX = T.repeat(FX, self.img_depth, axis=0)
 
+
             # apply to the batch of images
+            # FXT = FX
+            # FXT = FXT.transpose([0, 2, 1])
             W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
             W = W.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
 
             # Max hack: convert back to an image
-            II = my_batched_dot(my_batched_dot(FY.transpose([0, 2, 1]), W), FX)
+            tmp = my_batched_dot(FY.transpose([0, 2, 1]), W)
+            II = my_batched_dot(tmp, FX)
+            # II = T.zeros((3200*32*32))*center_x
+            #
+            II = II.reshape((batch_size, self.img_depth, self.img_height, self.img_width))
+            II = II.dimshuffle([0, 2, 3, 1])
 
-            II = II.reshape((batch_size, self.img_depth, self.img_height, self.img_width, channels))
-            II = II.dimshuffle([0, 4, 2, 3, 1])
-
+            # II = T.ones([batch_size, self.img_height*self.img_width*self.img_depth*channels], 'float32')*center_x
             return II.reshape((batch_size, self.img_height*self.img_width*self.img_depth*channels))
 
             # return W.reshape((batch_size, channels*N*N))
