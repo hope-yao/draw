@@ -50,10 +50,10 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     # image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
     image_size = (32,32,32)
     channels = 1
-    # train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
-    # test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
-    train_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('train',))
-    test_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('test',))
+    train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
+    # train_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('train',))
+    # test_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('test',))
 
     train_stream = Flatten(
         DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(train_set.num_examples, batch_size)))
