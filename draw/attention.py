@@ -13,18 +13,18 @@ floatX = theano.config.floatX
 
 #-----------------------------------------------------------------------------
         
-def my_batched_dot(A, B):     
-    """Batched version of dot-product.     
-       
-    For A[dim_1, dim_2, dim_3] and B[dim_1, dim_3, dim_4] this         
-    is \approx equal to:       
-               
-    for i in range(dim_1):     
+def my_batched_dot(A, B):
+    """Batched version of dot-product.
+
+    For A[dim_1, dim_2, dim_3] and B[dim_1, dim_3, dim_4] this
+    is \approx equal to:
+
+    for i in range(dim_1):
         C[i] = tensor.dot(A[i], B[i])
-       
-    Returns        
-    -------        
-        C : shape (dim_1 \times dim_2 \times dim_4)        
+
+    Returns
+    -------
+        C : shape (dim_1 \times dim_2 \times dim_4)
     """
     print(A.shape, B.shape)
     C = A.dimshuffle([0,1,2,'x']) * B.dimshuffle([0,'x',1,2])
@@ -342,25 +342,6 @@ class ZoomableAttentionWindow3d(object):
             self.img_depth = img_depth
             self.N = N
 
-        def filterbank_matrices_constant_gamma(self, center_y, center_x):
-            tol = 1e-4
-            N = self.N
-
-            rng = T.arange(N, dtype=floatX) - N / 2. + 0.5  # e.g.  [1.5, -0.5, 0.5, 1.5]
-
-            muX = center_x.dimshuffle([0, 'x'])
-            muY = center_y.dimshuffle([0, 'x'])
-
-            a = tensor.arange(self.img_width, dtype=floatX)
-            b = tensor.arange(self.img_height, dtype=floatX)
-
-            FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2.)
-            FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2.)
-            FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
-            FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
-
-            return FY, FX
-
         def read(self, images, center_y, center_x, delta, sigma):
             """Extract a batch of attention windows from the given images.
 
@@ -440,26 +421,8 @@ class ZoomableAttentionWindow3d(object):
         #         # FF = FF.reshape((batch_size, channels*self.img_depth*self.img_height*self.img_width))
         #         FF = tensor.ones((batch_size, channels*self.img_depth*self.img_height*self.img_width))*center_x
         #         return FF
-        #
-        #
 
-
-        def filterbank_matrices(self, center_y, center_x, delta, sigma):
-            """Create a Fy and a Fx
-
-            Parameters
-            ----------
-            center_y : T.vector (shape: batch_size)
-            center_x : T.vector (shape: batch_size)
-                Y and X center coordinates for the attention window
-            delta : T.vector (shape: batch_size)
-            sigma : T.vector (shape: batch_size)
-
-            Returns
-            -------
-                FY : T.fvector (shape: )
-                FX : T.fvector (shape: )
-            """
+        def filterbank_matrices(self, center_y, center_x, center_z, delta, sigma):
             tol = 1e-4
             N = self.N
 
@@ -467,16 +430,20 @@ class ZoomableAttentionWindow3d(object):
 
             muX = center_x.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
             muY = center_y.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
+            muZ = center_z.dimshuffle([0, 'x']) + delta.dimshuffle([0, 'x']) * rng
 
             a = tensor.arange(self.img_width, dtype=floatX)
             b = tensor.arange(self.img_height, dtype=floatX)
+            c = tensor.arange(self.img_depth, dtype=floatX)
 
             FX = tensor.exp(-(a - muX.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
             FY = tensor.exp(-(b - muY.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
+            FZ = tensor.exp(-(c - muZ.dimshuffle([0, 1, 'x'])) ** 2 / 2. / sigma.dimshuffle([0, 'x', 'x']) ** 2)
             FX = FX / (FX.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
             FY = FY / (FY.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
+            FZ = FZ / (FZ.sum(axis=-1).dimshuffle(0, 1, 'x') + tol)
 
-            return FY, FX
+            return FY, FX, FZ
 
         def read_large(self, images, center_y, center_x, center_z):
             N = self.N
@@ -484,41 +451,37 @@ class ZoomableAttentionWindow3d(object):
             batch_size = images.shape[0]
             print(images.ndim)
 
-            # delta = T.cast(theano.shared(np.ones(100)), 'float32')
-            # sigma = T.cast(theano.shared(np.ones(100)), 'float32')
             delta = T.ones([batch_size], 'float32')
             sigma = T.ones([batch_size], 'float32')
 
             # Reshape input into proper 3d images
             I = images.reshape((batch_size, self.img_height, self.img_width, self.img_depth))
-            I = I.dimshuffle([0, 2, 3, 1])
-            I = I.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
 
             # Get separable filterbank
-            FY, FX = self.filterbank_matrices(center_y, center_x, delta, sigma)
+            FY, FX, FZ = self.filterbank_matrices(center_y, center_x, center_z, delta, sigma)
 
-            FY = T.repeat(FY, self.img_depth, axis=0)
-            FX = T.repeat(FX, self.img_depth, axis=0)
-
+            FY = T.repeat(FY, channels, axis=0)
+            FX = T.repeat(FX, channels, axis=0)
+            FZ = T.repeat(FZ, channels, axis=0)
 
             # apply to the batch of images
-            # FXT = FX
-            # FXT = FXT.transpose([0, 2, 1])
-            W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
-            W = W.reshape((batch_size * self.img_depth, self.img_height, self.img_width))
-
-            # Max hack: convert back to an image
-            tmp = my_batched_dot(FY.transpose([0, 2, 1]), W)
-            II = my_batched_dot(tmp, FX)
-            # II = T.zeros((3200*32*32))*center_x
+            I1 = I.reshape((batch_size, self.img_height, self.img_width*self.img_depth))
+            IY = my_batched_dot(FY, I1).reshape((batch_size, N, self.img_width, self.img_depth))
+            I2 = IY.dimshuffle([0,1,3,2]).reshape((batch_size, N*self.img_depth, self.img_width))
+            IX = my_batched_dot(I2,FX.transpose([0, 2, 1])).reshape((batch_size, N, self.img_depth, N)).dimshuffle([0,1,3,2])
+            I3 = IX.dimshuffle([0,3,1,2]).reshape((batch_size, self.img_depth, N*N))
+            IZ = my_batched_dot(FZ, I3).reshape((batch_size, N, N, N)).dimshuffle([0,2,3,1])
             #
-            II = II.reshape((batch_size, self.img_depth, self.img_height, self.img_width))
-            II = II.dimshuffle([0, 2, 3, 1])
+            # Max hack: convert back to an image
+            IYY = my_batched_dot(FY.transpose([0, 2, 1]), IZ.reshape((batch_size, N, N*N))).reshape((batch_size, self.img_height, N, N))
+            I11 = IYY.dimshuffle([0,1,3,2]).reshape((batch_size, self.img_height*N, N))
+            IXX = my_batched_dot(I11, FX).reshape((batch_size, self.img_height, self.img_width, N)).dimshuffle([0,1,3,2])
+            I22 = IXX.dimshuffle([0,3,1,2]).reshape((batch_size, N, self.img_height*self.img_width))
+            IZZ = my_batched_dot(FZ.transpose([0, 2, 1]), I22).reshape((batch_size, self.img_depth, self.img_height, self.img_width)).dimshuffle([0,2,3,1])
 
-            # II = T.ones([batch_size, self.img_height*self.img_width*self.img_depth*channels], 'float32')*center_x
-            return II.reshape((batch_size, self.img_height*self.img_width*self.img_depth*channels))
-
-            # return W.reshape((batch_size, channels*N*N))
+            # IYY = my_batched_dot(FY.transpose([0, 2, 1]), IY.reshape((batch_size, N, self.img_width*self.img_depth))).reshape((batch_size, self.img_height, self.img_width, self.img_depth))
+            return IZZ.reshape((batch_size, self.img_height*self.img_width*self.img_depth))
+            # return IYY.reshape((batch_size, self.img_height*self.img_width*self.img_depth))
 
         def write(self, windows, center_y, center_x, delta, sigma):
             """Write a batch of windows into full sized images.

@@ -234,7 +234,7 @@ if __name__ == "__main__":
                             "on the MNIST dataset.")
     parser.add_argument("--num-epochs", type=int, default=100,
                         help="Number of training epochs to do.")
-    parser.add_argument("save_to", default="mnist", nargs="?",
+    parser.add_argument("save_to", default="mnist_lenet", nargs="?",
                         help="Destination to save the state of the training "
                              "process.")
     parser.add_argument("--feature-maps", type=int, nargs='+',

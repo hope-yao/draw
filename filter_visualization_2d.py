@@ -119,7 +119,7 @@ def img_grid(y, arr, cx, cy, x, global_scale=True):
     return img, full_img
 
 
-def run_classifier(p, subdir):
+def visualize(p, subdir):
     if isinstance(p, Model):
         model = p
     else:
@@ -127,7 +127,7 @@ def run_classifier(p, subdir):
         return
 
     # get test data
-    dataset = 'mnist_lenet'
+    dataset = 'mnist'
     image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
 
     # take a single test point
@@ -184,15 +184,15 @@ def run_classifier(p, subdir):
 
 
 
-model_file = 'c:\users\p2admin\documents\max\projects\draw\mnist_lenet-simple-20161103-214008/mnist_lenet'
+model_file = 'c:\users\p2admin\documents\max\projects\draw/mnist-simple-20161029-232558/mnist'
 with open(model_file, "rb") as f:
     p = load(f, 'model')
 
-subdir = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161103-214008/result'
+subdir = 'c:\users\p2admin\documents\max\projects\draw/mnist-simple-20161029-232558/mnist/result'
 if not os.path.exists(subdir):
     os.makedirs(subdir)
 
-run_classifier(p, subdir)
+visualize(p, subdir)
 
 
 

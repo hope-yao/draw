@@ -9,24 +9,29 @@ Attention - running history:
 
 7. lr 1e-3, no delta sigma, 100 train iter, no entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-143956/mnist - this should be working but somehow I stopped prematurely, rerun on 9
 8. lr 1e-3, no delta sigma, 100 train iter, no entropy, 8 t step, window size 5 - stopped, data in: mnist-simple-20161030-170531/mnist - stopped after 100 iter, error~0.4, ***need to run longer
-9. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 7 - done, data in: mnist-simple-20161030-204133/mnist - ~4.5% test error after 300 iter
+(*) 9. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 7 - done, data in: mnist-simple-20161030-204133/mnist - ~4.5% test error after 300 iter
 10. lr 1e-3, no delta sigma, 300 train iter, w/ entropy, 4 t step, window size 7 - stopped, data in: mnist-simple-20161030-222315/mnist - no good, does not converge on error
 
 11. lr 1e-3, no delta sigma, 100 train iter, no entropy, 8 t step, window size 7 - stopped, data in: mnist-simple-20161031-/mnist - following 8, now testing the idea of switching the obj between categoricalentropy and convergence
 
-12. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5 - running, data in: mnist-simple-20161101-203844/mnist - test if without being able to fully reveal the image, can still classify correctly
+(*) 12. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5 - done, data in: mnist-simple-20161101-203844/mnist - test if without being able to fully reveal the image, can still classify correctly - 4.8% test error after 300 iter, overfitting a little bit
 
 #13 I realized that n_iter can be reset in the test, and also from the result, it looks like reader is trying to reinforce its current belief which could be wrong,
 #so now test a cost function that minimizes categoricalentropy and MAXIMIZES entropy
 #Also add a layer to reader to allow more flexibility
 #Also clipped r to [0, 1]
-13. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5, reader 2 layer - running, data in: mnist-simple-20161101-232031/mnist
+(**) 13. lr 1e-3, no delta sigma, 300 train iter, no entropy, 3 t step, window size 5, reader 2 layer - done, data in: mnist-simple-20161101-232031/mnist - 8.5% test error after 300 iter, ***need test
+# ok, tested n_iter = 4, 8, 16, 32, 64, no improvement beyond the trained step size of 3. Looked at individual, not moving attention after 4 steps, and the 4th step is not smart, so I guess we cannot extend the attention mechanism using this obj
 
 #14 test the idea of gradually increase the iter, (and possibly also decrease the window size), to see if the model converges better
 #now take '12' and increase iter to 4
-14. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 5 - running, data in: mnist-simple-20161101-203844/mnist
+(*) 14. lr 1e-3, no delta sigma, 300 train iter, no entropy, 4 t step, window size 5 - done, data in: mnist-simple-20161102-164931/mnist - start with model from 12, test error ~3% after 300 iter
 
+(*) 15. lr 1e-4, no delta sigma, 300 train iter, no entropy, 5 t step, window size 5 - done, data in: mnist-simple-20161103-214008/mnist - start with model from 14, lr down to 1e-4, test error ~3.4% after 300 iter, overfitting?
 
+(*) 16. lr 1e-4, no delta sigma, 300 train iter, no entropy, 6 t step, window size 5 - stopped, data in: mnist-simple-20161104-212130/mnist - start with model from 15, test error still ~3.4 after 150 iter
+
+(**) 17. lr 1e-4, no delta sigma, 300 train iter, no entropy, 6 t step, window size 5 - stopped, data in: /mnist - start with model from 13, does not go under 8% after 144 iter
 
 
 LeNet

@@ -1,3 +1,5 @@
+'''save data to hdf5 format, from Max'''
+
 import numpy as np
 import h5py
 import tarfile, os
@@ -42,37 +44,39 @@ test_features = []
 test_targets = []
 for index, (array, name) in enumerate(train_dataset):
     if int(name[-3:])==1:
-        train_features.append(array.flatten())
+#         train_features.append(array.flatten())
+        train_features.append(array.reshape(1,array.shape[0],array.shape[1],array.shape[2]))
         train_targets.append([int(name[0:3])])
 for index, (array, name) in enumerate(test_dataset):
     if int(name[-3:]) == 1:
-        test_features.append(array.flatten())
+#         test_features.append(array.flatten())
+        test_features.append(array.reshape(1,array.shape[0],array.shape[1],array.shape[2]))
         test_targets.append([int(name[0:3])])
 
 train_features = np.array(train_features)
-train_targets = np.array(train_targets)
+train_targets = np.array(train_targets)-1 #starts from 0
 test_features = np.array(test_features)
-test_targets = np.array(test_targets)
-train_n, p = train_features.shape
+test_targets = np.array(test_targets)-1
+train_n, c, p1, p2, p3 = train_features.shape
 test_n = test_features.shape[0]
 n = train_n + test_n
 
 f = h5py.File('shapenet10.hdf5', mode='w')
-features = f.create_dataset('features', (n, p), dtype='uint8')
+features = f.create_dataset('input', (n, c, p1, p2, p3), dtype='uint8')
 targets = f.create_dataset('targets', (n, 1), dtype='uint8')
 
 features[...] = np.vstack([train_features, test_features])
 targets[...] = np.vstack([train_targets, test_targets])
 
 features.dims[0].label = 'batch'
-features.dims[1].label = 'features'
+features.dims[1].label = 'input'
 targets.dims[0].label = 'batch'
 targets.dims[1].label = 'index'
 
 from fuel.datasets.hdf5 import H5PYDataset
 split_dict = {
-    'train': {'features': (0, train_n), 'targets': (0, train_n)},
-    'test': {'features': (train_n, n), 'targets': (train_n, n)}}
+    'train': {'input': (0, train_n), 'targets': (0, train_n)},
+    'test': {'input': (train_n, n), 'targets': (train_n, n)}}
 f.attrs['split'] = H5PYDataset.create_split_array(split_dict)
 
 f.flush()

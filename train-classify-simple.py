@@ -66,11 +66,11 @@ sys.setrecursionlimit(100000)
 
 def main():
     batch_size = 100
-    n_iter = 4
+    n_iter = 6
     attention = 7
-    learning_rate = 1e-3
+    learning_rate = 1e-4
     epochs = 300
-    dataset = 'mnist'
+    dataset = 'mnist_lenet'
     image_size = (28, 28)
     channels = 1
 
@@ -126,7 +126,7 @@ def main():
 
 
     for iteration in range(1):
-        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/mnist-simple-20161101-203844/mnist' #window 5, iter 3
+        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/mnist_lenet-simple-20161101-232031/mnist_lenet' #window 5, iter 3
         try:
             with open(oldmodel_address, "rb") as f:
                 # oldmodel = pickle.load(f)
@@ -146,7 +146,7 @@ def main():
             draw.initialize()
 
             ## load existing model
-            # trained_address = 'c:\users\p2admin\documents\max\projects\draw\mnist-simple-20161030-204133\mnist' # attention = 7, n_iter = 4
+            # trained_address = 'c:\users\p2admin\documents\max\projects\draw\mnist_lenet-simple-20161030-204133\mnist_lenet' # attention = 7, n_iter = 4
             # with open(trained_address, "rb") as f:
                 # trained_model = load(f, 'model')
                 # draw = trained_model.get_top_bricks()[0]
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     # parser.add_argument("--name", type=str, dest="name",
     #                     default=None, help="Name for this experiment")
     # parser.add_argument("--dataset", type=str, dest="dataset",
-    #                     default="bmnist", help="Dataset to use: [bmnist|mnist|cifar10]")
+    #                     default="bmnist", help="Dataset to use: [bmnist|mnist_lenet|cifar10]")
     # parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",
     #                     default=100, help="Size of each mini-batch")
     # parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",

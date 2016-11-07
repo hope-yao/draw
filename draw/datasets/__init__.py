@@ -2,11 +2,11 @@
 from __future__ import division
 
 supported_datasets = ['bmnist', 'silhouettes']
-# ToDo: # 'mnist' and 'tfd' are not normalized (0<= x <=1.)
+# ToDo: # 'mnist_lenet' and 'tfd' are not normalized (0<= x <=1.)
 
 
 def get_data(data_name):
-    if data_name == 'mnist':
+    if data_name == 'mnist_lenet':
         from fuel.datasets import MNIST
         img_size = (28, 28)
         channels = 1

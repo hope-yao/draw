@@ -243,7 +243,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 
     def get_dim(self, name):
         if name == 'y':
-            return 10 # for mnist
+            return 10 # for mnist_lenet
         elif name == 'c':
             return self.conv_out_dim_flatten
         elif name == 'r':

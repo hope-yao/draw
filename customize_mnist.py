@@ -25,7 +25,7 @@ def convert_mnist(directory, output_directory, output_filename=None,
 
     Converts the MNIST dataset to an HDF5 dataset compatible with
     :class:`fuel.datasets.MNIST`. The converted dataset is
-    saved as 'mnist.hdf5'.
+    saved as 'mnist_lenet.hdf5'.
 
     This method assumes the existence of the following files:
     `train-images-idx3-ubyte.gz`, `train-labels-idx1-ubyte.gz`
@@ -62,7 +62,7 @@ def convert_mnist(directory, output_directory, output_filename=None,
         if dtype:
             output_filename = 'mnist_{}.hdf5'.format(dtype)
         else:
-            output_filename = 'mnist.hdf5'
+            output_filename = 'mnist_lenet.hdf5'
     output_path = os.path.join(output_directory, output_filename)
     h5file = h5py.File(output_path, mode='w')
 
@@ -108,7 +108,7 @@ def fill_subparser(subparser):
     Parameters
     ----------
     subparser : :class:`argparse.ArgumentParser`
-        Subparser handling the `mnist` command.
+        Subparser handling the `mnist_lenet` command.
 
     """
     subparser.add_argument(

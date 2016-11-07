@@ -274,7 +274,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, dest="name",
                         default=None, help="Name for this experiment")
     parser.add_argument("--dataset", type=str, dest="dataset",
-                        default="bmnist", help="Dataset to use: [bmnist|mnist|cifar10]")
+                        default="bmnist", help="Dataset to use: [bmnist|mnist_lenet|cifar10]")
     parser.add_argument("--epochs", type=int, dest="epochs",
                         default=100, help="Number of training epochs to do")
     parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",

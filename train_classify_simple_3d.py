@@ -50,8 +50,10 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     # image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
     image_size = (32,32,32)
     channels = 1
-    train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
-    test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
+    # train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
+    # test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
+    train_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('./draw/datasets/shapenet10.hdf5', which_sets=('test',))
 
     train_stream = Flatten(
         DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(train_set.num_examples, batch_size)))
@@ -125,7 +127,7 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     y_hat_last = y_hat[-1,:,:] # output should be batch_size * class
     # y_hat_last = y_hat
     # # classification_error = -T.mean(T.log(y_hat_last)*y.astype(np.int64))
-    y_int = T.cast(y, 'int64')
+    y_int = T.cast(y, 'int64') #MAX: might go from 1-10? need to check
     # recognition = -T.mean(T.log(y_hat_last)[T.arange(batch_size), y_int]) # guess (rnn_iter (16), class (10), batch_size)
     # recognition.name = "recognition"
     #
@@ -140,8 +142,8 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     error = (MisclassificationRate().apply(y_int.flatten(), y_hat_last)
                   .copy(name='error_rate'))
 
-    # cost = recognition
-    cost = recognition + recognition_convergence.mean()
+    cost = recognition
+    # cost = recognition + recognition_convergence.mean()
     cost.name = "cost"
 
     # _, activated_id = T.max_and_argmax(y_hat_last, axis=1)
@@ -268,7 +270,7 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, dest="name",
                         default=None, help="Name for this experiment")
     parser.add_argument("--dataset", type=str, dest="dataset",
-                        default="bmnist", help="Dataset to use: [bmnist|mnist|cifar10]")
+                        default="bmnist", help="Dataset to use: [bmnist|mnist_lenet|cifar10]")
     parser.add_argument("--epochs", type=int, dest="epochs",
                         default=100, help="Number of training epochs to do")
     parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",

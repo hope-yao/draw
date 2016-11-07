@@ -40,12 +40,12 @@ from draw.draw_classify_simple import *
 from blocks.serialization import load
 
 # import blocks
-# path = 'C:\Users\p2admin\Documents\Max\Projects\draw\mnist-20161009-204142\mnist'
+# path = 'C:\Users\p2admin\Documents\Max\Projects\draw\mnist_lenet-20161009-204142\mnist_lenet'
 # with open(path, "rb") as source:
 #     temp = blocks.serialization.load(source, 'model')
 # a = 1
 #
-# # with open('C:\Users\p2admin\Documents\Max\Projects\draw\mnist-20161009-204142\mnist', "rb") as f:
+# # with open('C:\Users\p2admin\Documents\Max\Projects\draw\mnist_lenet-20161009-204142\mnist_lenet', "rb") as f:
 # #     p = pickle.load(f)
 
 # attention = 2

@@ -101,9 +101,6 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         super(DrawClassifyModel3d, self).__init__(**kwargs)
 
         self.n_iter = 8
-        y_dim = 10
-        rnn_dim = 64
-        num_filters = 16
 
         rnninits = {
             # 'weights_init': Orthogonal(),
@@ -211,7 +208,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         conv_out_dim = self.conv_sequence.get_dim('output')
         self.conv_out_dim_flatten = np.prod(conv_out_dim)
         reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
-                                 channels=channels, width=img_width, height=img_height, depth =img_depth,
+                                 channels=channels, width=img_width, height=img_height, depth=img_depth,
                                  N=read_N, **inits)
         # reader = Reader(x_dim=self.x_dim)
 
@@ -242,7 +239,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
 
     def get_dim(self, name):
         if name == 'y':
-            return 10 # for mnist
+            return 10 # for mnist_lenet
         elif name == 'c':
             return self.conv_out_dim_flatten
         elif name == 'r':
