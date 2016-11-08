@@ -475,13 +475,16 @@ class ZoomableAttentionWindow3d(object):
             # Max hack: convert back to an image
             IYY = my_batched_dot(FY.transpose([0, 2, 1]), IZ.reshape((batch_size, N, N*N))).reshape((batch_size, self.img_height, N, N))
             I11 = IYY.dimshuffle([0,1,3,2]).reshape((batch_size, self.img_height*N, N))
-            IXX = my_batched_dot(I11, FX).reshape((batch_size, self.img_height, self.img_width, N)).dimshuffle([0,1,3,2])
+            IXX = my_batched_dot(I11, FX).reshape((batch_size, self.img_height, N, self.img_width)).dimshuffle([0,1,3,2])
             I22 = IXX.dimshuffle([0,3,1,2]).reshape((batch_size, N, self.img_height*self.img_width))
             IZZ = my_batched_dot(FZ.transpose([0, 2, 1]), I22).reshape((batch_size, self.img_depth, self.img_height, self.img_width)).dimshuffle([0,2,3,1])
 
-            # IYY = my_batched_dot(FY.transpose([0, 2, 1]), IY.reshape((batch_size, N, self.img_width*self.img_depth))).reshape((batch_size, self.img_height, self.img_width, self.img_depth))
             return IZZ.reshape((batch_size, self.img_height*self.img_width*self.img_depth))
+
+            # IYY = my_batched_dot(FY.transpose([0, 2, 1]), IY.reshape((batch_size, N, self.img_width*self.img_depth))).reshape((batch_size, self.img_height, self.img_width, self.img_depth))
             # return IYY.reshape((batch_size, self.img_height*self.img_width*self.img_depth))
+
+            # return IZ.reshape((batch_size, N*N*N))
 
         def write(self, windows, center_y, center_x, delta, sigma):
             """Write a batch of windows into full sized images.
@@ -643,29 +646,32 @@ if __name__ == "__main__":
     center_z_ = T.vector()
     delta_ = T.vector()
     sigma_ = T.vector()
-    W_ = att.read_large(I_, center_x_,  center_y_,center_z_)
+    W_ = att.read_large(I_, center_x_, center_y_, center_z_)
 
     do_read = theano.function(inputs=[I_, center_x_, center_y_, center_z_],
                               outputs=W_)
 
     #------------------------------------------------------------------------
-    from fuel.datasets.hdf5 import H5PYDataset
-    train_set = H5PYDataset('../layer3D/shapenet10.hdf5', which_sets=('train',))
-    handle = train_set.open()
-    data = train_set.get_data(handle, slice(0, 1))
-    I = data[0].reshape(1,width*height*depth)
-    print((I.shape))
+    # from fuel.datasets.hdf5 import H5PYDataset
+    # train_set = H5PYDataset('../layer3D/shapenet10.hdf5', which_sets=('train',))
+    # handle = train_set.open()
+    # data = train_set.get_data(handle, slice(0, 1))
+    # I = data[0].reshape(1,width*height*depth)
+    # print((I.shape))
 
     center_x = [15]
     center_y = [15]
     center_z = [15]
 
     I = np.float32(np.ones((1,width*height*depth)))
-    W  = do_read(I, center_x, center_x, center_z )
-    II = I.reshape((height, width, depth))
-    II = np.ones((height, width, depth))
+    # I = np.float32(np.zeros((1, width, height, depth)))
+    # I[0,15:16,:,:] = 1.
+    # I = I.reshape((1,width*height*depth))
+    W = do_read(I, center_x, center_x, center_z )
+    # II = I.reshape((height, width, depth))
+    # II = np.ones((height, width, depth))
     WW = W.reshape((height, width, depth))
-
+    # WW = W.reshape((N, N, N))
 
     def viz2(V):
         V = V / np.max(V)
@@ -745,7 +751,7 @@ if __name__ == "__main__":
         fig.colorbar(im, cax=cax, orientation='vertical')
 
         plt.show()
-
+        a = 1
 
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt

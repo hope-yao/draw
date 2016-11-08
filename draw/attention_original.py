@@ -124,9 +124,6 @@ class ZoomableAttentionWindow(object):
         FY = T.repeat(FY, channels, axis=0)
         FX = T.repeat(FX, channels, axis=0)
 
-        # apply to the batch of images
-        W = my_batched_dot(my_batched_dot(FY, I), FX.transpose([0, 2, 1]))
-
         return W.reshape((batch_size, channels * N * N))
 
     def read_large(self, images, center_y, center_x, delta, sigma):
