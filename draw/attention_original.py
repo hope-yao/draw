@@ -300,7 +300,7 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------------
 
-    I = Image.open("full.png")
+    I = Image.open("cat.jpg")
     I = I.resize((28, 28))  # .convert('L')
 
     I = np.asarray(I).transpose([2, 0, 1])

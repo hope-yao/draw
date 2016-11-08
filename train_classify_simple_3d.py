@@ -165,6 +165,11 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
         # step_rule=Momentum(learning_rate=learning_rate, momentum=0.95)
         step_rule=Scale(learning_rate=learning_rate)
     )
+    from blocks.algorithms import AdaDelta
+    # algorithm = AdaDelta(
+    #     cost=cost,
+    #     parameters=params
+    # )
 
     # ------------------------------------------------------------------------
     # Setup monitors
@@ -198,7 +203,7 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
             main_loop = MainLoop(
                 model=oldmodel,
                 data_stream=train_stream,
-                algorithm=algorithm,
+                algorithm=AdaDelta,
                 extensions=[
                                Timing(),
                                FinishAfter(after_n_epochs=epochs),
@@ -276,11 +281,11 @@ if __name__ == "__main__":
     parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",
                         default=100, help="Size of each mini-batch")
     parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",
-                        default=1e-3, help="Learning rate")
+                        default=1e-2, help="Learning rate")
     parser.add_argument("--attention", "-a", type=str,
-                        default=3, help="Use attention mechanism (read_window)")
+                        default=10, help="Use attention mechanism (read_window)")
     parser.add_argument("--niter", type=int, dest="n_iter",
-                        default=1, help="No. of iterations")
+                        default=27, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",
                         default=256, help="Encoder RNN state dimension") # originally 256
     parser.add_argument("--y-dim", type=int, dest="y_dim",
