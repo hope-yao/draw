@@ -26,7 +26,7 @@ def my_batched_dot(A, B):
     -------
         C : shape (dim_1 \times dim_2 \times dim_4)
     """
-    print(A.shape, B.shape)
+    # print(A.shape, B.shape)
     C = A.dimshuffle([0,1,2,'x']) * B.dimshuffle([0,'x',1,2])
     return C.sum(axis=-2)
 
@@ -446,10 +446,11 @@ class ZoomableAttentionWindow3d(object):
             return FY, FX, FZ
 
         def read_large(self, images, center_y, center_x, center_z):
+            # center_x = center_y = center_z = center_y/center_y*0.5
             N = self.N
             channels = self.channels
             batch_size = images.shape[0]
-            print(images.ndim)
+            # print(images.ndim)
 
             delta = T.ones([batch_size], 'float32')
             sigma = T.ones([batch_size], 'float32')
@@ -631,7 +632,7 @@ class ZoomableAttentionWindow3d(object):
 
 if __name__ == "__main__":
 
-    N = 5
+    N = 32
     channels = 1
     depth = 32
     height = 32
@@ -663,18 +664,15 @@ if __name__ == "__main__":
     center_y = [15]
     center_z = [15]
 
-    I = np.float32(np.ones((1,width*height*depth)))
-    # I = np.float32(np.zeros((1, width, height, depth)))
-    # I[0,15:16,:,:] = 1.
-    # I = I.reshape((1,width*height*depth))
-    W = do_read(I, center_x, center_x, center_z )
-    # II = I.reshape((height, width, depth))
-    # II = np.ones((height, width, depth))
+    I = np.zeros((width,height,depth))
+    I[center_x,:,:] = np.ones((height, depth))
+    I = I.reshape((1,width*height*depth))
+    I = np.float32(I)
+    W = do_read(I, center_x, center_y, center_z )
     WW = W.reshape((height, width, depth))
-    # WW = W.reshape((N, N, N))
 
     def viz2(V):
-        V = V / np.max(V)
+        # V = V / np.max(V)
 
         x = y = z = t = []
         x1 = y1 = z1 = t1 = []
@@ -684,11 +682,11 @@ if __name__ == "__main__":
             for j in range(V.shape[1]):
                 for k in range(V.shape[2]):
                     if V[i, j, k] != 0:
-                        # V > 1e-1
-                        x = x + [i]
-                        y = y + [j]
-                        z = z + [k]
-                        t = t + [V[i, j, k]]
+                        if (V[i, j, k] > 1e-1):
+                            x = x + [i]
+                            y = y + [j]
+                            z = z + [k]
+                            t = t + [V[i, j, k]]
                         if i==15:
                             y1 = y1 + [j]
                             z1 = z1 + [k]
@@ -716,42 +714,75 @@ if __name__ == "__main__":
         y3 = np.asarray(y3)
         t3 = np.asarray(t3)
 
+
+        fig, axes = plt.subplots(nrows=2, ncols=2,)
+
+        # ax0 = axes.flat[0]
+        # im = ax0.scatter(x, y, z, c=t, marker='o')
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+
+        ax1 = axes.flat[1]
+        im = ax1.scatter(y1, z1, c=t1, marker='o', s=30)
+        plt.xlim(0, V.shape[0])
+        plt.ylim(0, V.shape[1])
+
+        ax2 = axes.flat[2]
+        im = ax2.scatter(x2, z2, c=t2, marker='o', s=30)
+        plt.xlim(0, V.shape[0])
+        plt.ylim(0, V.shape[1])
+
+        ax3 = axes.flat[3]
+        im = ax3.scatter(x3, y3, c=t3, marker='o', s=30)
+        plt.xlim(0, V.shape[0])
+        plt.ylim(0, V.shape[1])
+
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+
+
         fig = plt.figure()
-        ax = fig.add_subplot(221, projection='3d')
+        ax = fig.add_subplot(111, projection='3d')
         im = ax.scatter(x, y, z, c=t, marker='o', s=10)
         ax.set_xlabel('X Label')
         ax.set_ylabel('Y Label')
         ax.set_zlabel('Z Label')
         plt.xlim(0, V.shape[0])
         plt.ylim(0, V.shape[1])
-
-        ax = fig.add_subplot(222)
-        im = ax.scatter(y1, z1, c=t1, marker='o', s=30)
-        ax.set_xlabel('Y Label')
-        ax.set_ylabel('Z Label')
-        plt.xlim(0, V.shape[0])
-        plt.ylim(0, V.shape[1])
-
-        ax = fig.add_subplot(223)
-        im = ax.scatter(x2, z2, c=t2, marker='o', s=30)
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Z Label')
-        plt.xlim(0, V.shape[0])
-        plt.ylim(0, V.shape[1])
-
-        ax = fig.add_subplot(224)
-        im = ax.scatter(x3, y3, c=t3, marker='o', s=30)
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        plt.xlim(0, V.shape[0])
-        plt.ylim(0, V.shape[1])
-
-        cax = fig.add_axes([0.9, 0.15, 0.05, 0.7])
-        # cax = fig.add_axes([0.27, 0.8, 0.5, 0.05])
-        fig.colorbar(im, cax=cax, orientation='vertical')
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
 
         plt.show()
-        a = 1
+        #
+        # ax = fig.add_subplot(222)
+        # im = ax.scatter(y1, z1, c=t1, marker='o', s=30)
+        # ax.set_xlabel('Y Label')
+        # ax.set_ylabel('Z Label')
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # ax = fig.add_subplot(223)
+        # im = ax.scatter(x2, z2, c=t2, marker='o', s=30)
+        # ax.set_xlabel('X Label')
+        # ax.set_ylabel('Z Label')
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # ax = fig.add_subplot(224)
+        # im = ax.scatter(x3, y3, c=t3, marker='o', s=30)
+        # ax.set_xlabel('X Label')
+        # ax.set_ylabel('Y Label')
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # cax = fig.add_axes([0.9, 0.15, 0.05, 0.7])
+        # # cax = fig.add_axes([0.27, 0.8, 0.5, 0.05])
+        # fig.colorbar(im, cax=cax, orientation='vertical')
+        #
+        # plt.show()
+        # a = 1
 
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt

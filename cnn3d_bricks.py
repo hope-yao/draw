@@ -11,9 +11,7 @@ from blocks.bricks import (Initializable, Feedforward, Sequence, Activation,
 from blocks.bricks.base import application, Brick, lazy
 from blocks.roles import add_role, FILTER, BIAS
 from blocks.utils import shared_floatx_nans
-import theano
 from theano import tensor
-
 
 class Convolutional3(LinearLike):
     """Performs a 2D convolution.
