@@ -97,10 +97,10 @@ class AttentionReader3d(Initializable):
         return r, center_x, center_y, center_z
 
 class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
-    def __init__(self, image_size, channels, attention, **kwargs):
+    def __init__(self, image_size, channels, attention, n_iter, **kwargs):
         super(DrawClassifyModel3d, self).__init__(**kwargs)
 
-        self.n_iter = 1
+        self.n_iter = n_iter
 
         rnninits = {
             # 'weights_init': Orthogonal(),
@@ -147,8 +147,8 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
 #-----------------------------------------------------------------------------------------------------------------------
         # USE LeNet
 
-        feature_maps = [16, 32] #[20, 50]
-        mlp_hiddens = [500] # 500
+        feature_maps = [16, 24] #[20, 50]
+        mlp_hiddens = [250] # 500
         conv_sizes = [5, 5, 5] # [5, 5]
         pool_sizes = [2, 2, 2]
         # image_size = (28, 28)
@@ -207,10 +207,9 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         self.conv_sequence._push_allocation_config()
         conv_out_dim = self.conv_sequence.get_dim('output')
         self.conv_out_dim_flatten = np.prod(conv_out_dim)
-        # reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
-        #                          channels=channels, width=img_width, height=img_height, depth=img_depth,
-        #                          N=read_N, **inits)
-        reader = Reader(x_dim=self.x_dim)
+        reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
+                                 channels=channels, width=img_width, height=img_height, depth=img_depth,
+                                 N=read_N, **inits)
         # reader = Reader(x_dim=self.x_dim)
 
         self.reader = reader
@@ -260,7 +259,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
 
     @recurrent(sequences=['dummy'], contexts=['x'],
                states=['r', 'c'],
-               outputs=['y', 'r', 'c'])
+               outputs=['y', 'r', 'c', 'cx', 'cy', 'cz'])
     def apply(self, c, r, x, dummy):
         # r, cx, cy, delta, sigma = self.reader.apply(x, c)
         # a = self.encoder_conv.apply(r)
@@ -273,19 +272,18 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         # c = c + cc
         # y = self.decoder_mlp.apply(c)
 
-        # rr, center_x, center_y, center_z = self.reader.apply(x, c)
-        rr = self.reader.apply(x)
+        rr, center_x, center_y, center_z = self.reader.apply(x, c)
         r = r + rr # combine revealed images
         batch_size = r.shape[0]
         c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,32,32,32)))
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 
-        return y, r, c
+        return y, r, c, center_x, center_y, center_z
 
     # ------------------------------------------------------------------------
 
-    @application(inputs=['features'], outputs=['targets', 'r', 'c'])
+    @application(inputs=['features'], outputs=['targets', 'r', 'c', 'cx', 'cy', 'cz'])
     def classify(self, features):
         batch_size = features.shape[0]
         # Sample from mean-zeros std.-one Gaussian
@@ -294,6 +292,174 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
             avg=0., std=1.)
 
         # y, r, c, center_x, center_y, delta, sigma = self.apply(x=features, dummy=u)
-        y, r, c = self.apply(x=features, dummy=u)
+        y, r, c, cx, cy, cz = self.apply(x=features, dummy=u)
 
-        return y, r, c
+        return y, r, c, cx, cy, cz
+
+
+
+
+#=============================================================================
+
+if __name__ == "__main__":
+
+    import numpy
+
+    image_size = (32,32,32)
+    channels = 1
+    attention = 5
+
+    import tarfile
+    tarball = tarfile.open('./draw3d.pkl', 'r')
+    ps = numpy.load(tarball.extractfile(tarball.getmember('_parameters')))
+    sorted(ps.keys())
+    conv_W0 = ps['|drawclassifymodel3d|convolutionalsequence3|conv_0.W']
+    conv_b0 = ps['|drawclassifymodel3d|convolutionalsequence3|conv_0.b']
+    conv_W1 = ps['|drawclassifymodel3d|convolutionalsequence3|conv_1.W']
+    conv_b1 = ps['|drawclassifymodel3d|convolutionalsequence3|conv_1.b']
+    mlp_W0 = ps['|drawclassifymodel3d|mlp|linear_0.W']
+    mlp_b0 = ps['|drawclassifymodel3d|mlp|linear_0.b']
+    mlp_W1 = ps['|drawclassifymodel3d|mlp|linear_1.W']
+    mlp_b1 = ps['|drawclassifymodel3d|mlp|linear_1.b']
+    reader_W = ps['|drawclassifymodel3d|reader|mlp|linear_0.W']
+    reader_b = ps['|drawclassifymodel3d|reader|mlp|linear_0.b']
+
+    draw = DrawClassifyModel3d(image_size=image_size, channels=channels, attention=attention, n_iter=16)
+    draw.push_initialization_config()
+    draw.conv_sequence.layers[0].weights_init = Constant(conv_W0)
+    draw.conv_sequence.layers[1].weights_init = Constant(conv_W1)
+    draw.top_mlp.linear_transformations[0].weights_init = Constant(mlp_W0)
+    draw.top_mlp.linear_transformations[1].weights_init = Constant(mlp_W1)
+    draw.conv_sequence.layers[0].biases_init = Constant(conv_b0)
+    draw.conv_sequence.layers[1].biases_init = Constant(conv_b1)
+    draw.top_mlp.linear_transformations[0].biases_init = Constant(mlp_b0)
+    draw.top_mlp.linear_transformations[1].biases_init = Constant(mlp_b1)
+    draw.reader.readout.weights_init = Constant(reader_W)
+    draw.reader.readout.biases_init = Constant(reader_b)
+
+    draw.initialize()
+
+    x = tensor.matrix('input') # keyword from fuel
+    y = tensor.matrix('targets') # keyword from fuel
+    y_hat, r, c, cx, cy, cz = draw.classify(x)
+    f = theano.function([x], [y_hat,r,c,cx,cy,cz])
+
+    from fuel.datasets.hdf5 import H5PYDataset
+    train_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('./layer3D/shapenet10.hdf5', which_sets=('test',))
+    handle = train_set.open()
+    train_data = train_set.get_data(handle, slice(0, 10))
+    handletest = test_set.open()
+    test_data = test_set.get_data(handletest, slice(0, 10))
+    train_features = train_data[0]
+
+    # for [y, r, c, cx, cy, cz] in f(train_features[0,:,:,:].reshape(1,32*32*32)):
+    #     print(cx, cy, cz)
+    y, r, c, cx, cy, cz = f(train_features[5,:,:,:].reshape(1,32*32*32))
+
+    '''visualize 3D data'''
+    def plot_cube(ax, x, y, z, inc, a):
+        "x y z location and alpha"
+        ax.plot_surface([[x, x + inc], [x, x + inc]], [[y, y], [y + inc, y + inc]], z, alpha=a,facecolors='y')
+        ax.plot_surface([[x, x + inc], [x, x + inc]], [[y, y], [y + inc, y + inc]], z + inc, alpha=a,facecolors='y')
+
+        ax.plot_surface(x, [[y, y], [y + inc, y + inc]], [[z, z + inc], [z, z + inc]], alpha=a,facecolors='y')
+        ax.plot_surface(x + inc, [[y, y], [y + inc, y + inc]], [[z, z + inc], [z, z + inc]], alpha=a,facecolors='y')
+
+        ax.plot_surface([[x, x], [x + inc, x + inc]], y, [[z, z + inc], [z, z + inc]], alpha=a,facecolors='y')
+        ax.plot_surface([[x, x], [x + inc, x + inc]], y + inc, [[z, z + inc], [z, z + inc]], alpha=a,facecolors='y')
+
+    def viz2(V,cx,cy,cz):
+
+        x = y = z = t = []
+        x1 = y1 = z1 = t1 = []
+        x2 = y2 = z2 = t2 = []
+        x3 = y3 = z3 = t3 = []
+        for i in range(V.shape[0]):
+            for j in range(V.shape[1]):
+                for k in range(V.shape[2]):
+                    if V[i, j, k] != 0:
+                        if (V[i, j, k] > 1e-1):
+                            x = x + [i]
+                            y = y + [j]
+                            z = z + [k]
+                            t = t + [V[i, j, k]]
+                        if i==15:
+                            y1 = y1 + [j]
+                            z1 = z1 + [k]
+                            t1 = t1 + [V[i, j, k]]
+                        if j==15:
+                            x2 = x2 + [i]
+                            z2 = z2 + [k]
+                            t2 = t2 + [V[i, j, k]]
+                        if k==15:
+                            x3 = x3 + [i]
+                            y3 = y3 + [j]
+                            t3 = t3 + [V[i, j, k]]
+
+        x = np.asarray(x)
+        y = np.asarray(y)
+        z = np.asarray(z)
+        t = np.asarray(t)
+        y1 = np.asarray(y1)
+        z1 = np.asarray(z1)
+        t1 = np.asarray(t1)
+        x2 = np.asarray(x2)
+        z2 = np.asarray(z2)
+        t2 = np.asarray(t2)
+        x3 = np.asarray(x3)
+        y3 = np.asarray(y3)
+        t3 = np.asarray(t3)
+
+        # # slice along axis
+        # fig, axes = plt.subplots(nrows=2, ncols=2,)
+        #
+        # ax1 = axes.flat[1]
+        # im = ax1.scatter(y1, z1, c=t1, marker='o', s=30)
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # ax2 = axes.flat[2]
+        # im = ax2.scatter(x2, z2, c=t2, marker='o', s=30)
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # ax3 = axes.flat[3]
+        # im = ax3.scatter(x3, y3, c=t3, marker='o', s=30)
+        # plt.xlim(0, V.shape[0])
+        # plt.ylim(0, V.shape[1])
+        #
+        # fig.subplots_adjust(right=0.8)
+        # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        # fig.colorbar(im, cax=cbar_ax)
+
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        im = ax.scatter(x, y, z, c=t, marker='o', s=10, alpha=0.2)
+        im = ax.scatter(cx, cy, cz, c=range(1,cx.shape[0]+1,1), marker='s', s=30)
+        d = 3
+        for i in range(len(cx)):
+            plot_cube(ax, cx[i][0]-d/2, cy[i][0]-d/2, cz[i][0]-d/2, d, i/len(cx))
+        ax.set_xlabel('X Label')
+        ax.set_ylabel('Y Label')
+        ax.set_zlabel('Z Label')
+        plt.xlim(0, V.shape[0])
+        plt.ylim(0, V.shape[1])
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+
+        plt.show()
+        plt.hold(True)
+
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    # viz2(train_features[5,:,:,:].reshape(32,32,32),cx,cy,cz)
+    pp = []
+    for i in range(16):
+        pp = pp + [y[i][0][train_data[1][5][0]]]
+    print (pp)
+    print(cx)
+    print(cy)
+    print(cz)

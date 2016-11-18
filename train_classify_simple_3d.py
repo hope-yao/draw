@@ -42,6 +42,33 @@ from draw_classify_simple_3d import *
 sys.setrecursionlimit(100000)
 
 
+
+import numpy
+from blocks.initialization import NdarrayInitialization
+from blocks.utils import repr_attrs
+
+class ldarray(NdarrayInitialization):
+    """Initialize parameters to a constant.
+    The constant may be a scalar or a :class:`~numpy.ndarray` of any shape
+    that is broadcastable with the requested parameter arrays.
+    Parameters
+    ----------
+    constant : :class:`~numpy.ndarray`
+        The initialization value to use. Must be a scalar or an ndarray (or
+        compatible object, such as a nested list) that has a shape that is
+        broadcastable with any shape requested by `initialize`.
+    """
+    def __init__(self, constant, nparray):
+        self.constant = numpy.asarray(nparray)
+
+    def generate(self, rng, shape):
+        dest = numpy.empty(shape, dtype=theano.config.floatX)
+        dest[...] = self.constant
+        return dest
+
+    def __repr__(self):
+        return repr_attrs(self, 'constant')
+
 # ----------------------------------------------------------------------------
 
 def main(name, dataset, epochs, batch_size, learning_rate, attention,
@@ -105,9 +132,37 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     print()
 
     # ----------------------------------------------------------------------
+    # from draw_classify_simple_3d import DrawClassifyModel3d
+    #
+    # import tarfile
+    # tarball = tarfile.open('./layer3D/3DLeNet.pkl', 'r')
+    # ps = numpy.load(tarball.extractfile(tarball.getmember('_parameters')))
+    # sorted(ps.keys())
+    # conv_W0 = ps['|lenet|convolutionalsequence3|conv_0.W']
+    # conv_b0 = ps['|lenet|convolutionalsequence3|conv_0.b']
+    # conv_W1 = ps['|lenet|convolutionalsequence3|conv_1.W']
+    # conv_b1 = ps['|lenet|convolutionalsequence3|conv_1.b']
+    # mlp_W0 = ps['|lenet|mlp|linear_0.W']
+    # mlp_b0 = ps['|lenet|mlp|linear_0.b']
+    # mlp_W1 = ps['|lenet|mlp|linear_1.W']
+    # mlp_b1 = ps['|lenet|mlp|linear_1.b']
+    #
+    # draw = DrawClassifyModel3d(image_size=image_size, channels=channels, attention=attention)
+    # draw.push_initialization_config()
+    # draw.conv_sequence.layers[0].weights_init = Constant(conv_W0)
+    # draw.conv_sequence.layers[1].weights_init = Constant(conv_W1)
+    # draw.top_mlp.linear_transformations[0].weights_init = Constant(mlp_W0)
+    # draw.top_mlp.linear_transformations[1].weights_init = Constant(mlp_W1)
+    # draw.conv_sequence.layers[0].biases_init = Constant(conv_b0)
+    # draw.conv_sequence.layers[1].biases_init = Constant(conv_b1)
+    # draw.top_mlp.linear_transformations[0].biases_init = Constant(mlp_b0)
+    # draw.top_mlp.linear_transformations[1].biases_init = Constant(mlp_b1)
+    # draw.initialize()
+
+    # ----------------------------------------------------------------------
     from draw_classify_simple_3d import DrawClassifyModel3d
 
-    draw = DrawClassifyModel3d(image_size=image_size, channels=channels, attention=attention)
+    draw = DrawClassifyModel3d(image_size=image_size, channels=channels, attention=attention, n_iter = n_iter)
     draw.push_initialization_config()
     draw.conv_sequence.layers[0].weights_init = Uniform(width=.2)
     draw.conv_sequence.layers[1].weights_init = Uniform(width=.09)
@@ -116,13 +171,15 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
     draw.initialize()
 
     # ------------------------------------------------------------------------
+
     x = tensor.matrix('input') # keyword from fuel
     y = tensor.matrix('targets') # keyword from fuel
     # dtensor5 = T.TensorType(floatX, (False,) * 5)
     # x = dtensor5(name='input')
     # y = tensor.lmatrix('targets')
 
-    y_hat, _, _ = draw.classify(x)
+    # y_hat, _, _, _, _, _ = draw.classify(x)
+    y_hat, _, _, _, _, _ = draw.classify(x)
 
     y_hat_last = y_hat[-1,:,:] # output should be batch_size * class
     # y_hat_last = y_hat
@@ -203,7 +260,7 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
             main_loop = MainLoop(
                 model=oldmodel,
                 data_stream=train_stream,
-                algorithm=AdaDelta,
+                algorithm=algorithm,
                 extensions=[
                                Timing(),
                                FinishAfter(after_n_epochs=epochs),
@@ -254,10 +311,9 @@ def main(name, dataset, epochs, batch_size, learning_rate, attention,
                                #                updates=scan_updates,
                                prefix="test"),
                            # Checkpoint(name, before_training=False, after_epoch=True, save_separately=['log', 'model']),
-                           Checkpoint("{}/{}".format(subdir, name), save_main_loop=False, before_training=True,
-                                      after_epoch=True, save_separately=['log', 'model']),
-                           # SampleCheckpoint(image_size=image_size[0], channels=channels, save_subdir=subdir,
-                           #                  before_training=True, after_epoch=True),
+                           # Checkpoint("{}/{}".format(subdir, name), save_main_loop=False, before_training=True,
+                           #            after_epoch=True, save_separately=['log', 'model']),
+                           Checkpoint("draw3d.pkl"),
                            ProgressBar(),
                            Printing()] + plotting_extensions)
 
@@ -277,15 +333,15 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, dest="dataset",
                         default="bmnist", help="Dataset to use: [bmnist|mnist_lenet|cifar10]")
     parser.add_argument("--epochs", type=int, dest="epochs",
-                        default=100, help="Number of training epochs to do")
+                        default=20, help="Number of training epochs to do")
     parser.add_argument("--bs", "--batch-size", type=int, dest="batch_size",
                         default=100, help="Size of each mini-batch")
     parser.add_argument("--lr", "--learning-rate", type=float, dest="learning_rate",
-                        default=1e-2, help="Learning rate")
+                        default=1e-3, help="Learning rate")
     parser.add_argument("--attention", "-a", type=str,
-                        default=32, help="Use attention mechanism (read_window)")
+                        default=5, help="Use attention mechanism (read_window)")
     parser.add_argument("--niter", type=int, dest="n_iter",
-                        default=1, help="No. of iterations")
+                        default=16, help="No. of iterations")
     parser.add_argument("--rnn-dim", type=int, dest="rnn_dim",
                         default=256, help="Encoder RNN state dimension") # originally 256
     parser.add_argument("--y-dim", type=int, dest="y_dim",
