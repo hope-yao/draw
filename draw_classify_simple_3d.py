@@ -100,7 +100,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
         super(DrawClassifyModel3d, self).__init__(**kwargs)
 
-        self.n_iter = 8
+        self.n_iter = 1
 
         rnninits = {
             # 'weights_init': Orthogonal(),
@@ -207,9 +207,10 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         self.conv_sequence._push_allocation_config()
         conv_out_dim = self.conv_sequence.get_dim('output')
         self.conv_out_dim_flatten = np.prod(conv_out_dim)
-        reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
-                                 channels=channels, width=img_width, height=img_height, depth=img_depth,
-                                 N=read_N, **inits)
+        # reader = AttentionReader3d(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
+        #                          channels=channels, width=img_width, height=img_height, depth=img_depth,
+        #                          N=read_N, **inits)
+        reader = Reader(x_dim=self.x_dim)
         # reader = Reader(x_dim=self.x_dim)
 
         self.reader = reader
@@ -259,7 +260,7 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
 
     @recurrent(sequences=['dummy'], contexts=['x'],
                states=['r', 'c'],
-               outputs=['y', 'r', 'c', 'cx', 'cy', 'cz'])
+               outputs=['y', 'r', 'c'])
     def apply(self, c, r, x, dummy):
         # r, cx, cy, delta, sigma = self.reader.apply(x, c)
         # a = self.encoder_conv.apply(r)
@@ -272,18 +273,19 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
         # c = c + cc
         # y = self.decoder_mlp.apply(c)
 
-        rr, center_x, center_y, center_z = self.reader.apply(x, c)
+        # rr, center_x, center_y, center_z = self.reader.apply(x, c)
+        rr = self.reader.apply(x)
         r = r + rr # combine revealed images
         batch_size = r.shape[0]
         c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,32,32,32)))
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 
-        return y, r, c, center_x, center_y, center_z
+        return y, r, c
 
     # ------------------------------------------------------------------------
 
-    @application(inputs=['features'], outputs=['targets', 'r', 'c', 'cx', 'cy', 'cz'])
+    @application(inputs=['features'], outputs=['targets', 'r', 'c'])
     def classify(self, features):
         batch_size = features.shape[0]
         # Sample from mean-zeros std.-one Gaussian
@@ -292,6 +294,6 @@ class DrawClassifyModel3d(BaseRecurrent, Initializable, Random):
             avg=0., std=1.)
 
         # y, r, c, center_x, center_y, delta, sigma = self.apply(x=features, dummy=u)
-        y, r, c, cx, cy, cz = self.apply(x=features, dummy=u)
+        y, r, c = self.apply(x=features, dummy=u)
 
-        return y, r, c, cx, cy, cz
+        return y, r, c

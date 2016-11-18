@@ -1,4 +1,7 @@
-10/31/2016
+11/08/2016
+Moved everything to ./results
+
+
 Attention - running history:
 1. lr 1e-3
 2. lr 1e-5

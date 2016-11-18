@@ -32,6 +32,9 @@ from fuel.datasets import MNIST
 from fuel.schemes import ShuffledScheme
 from fuel.streams import DataStream
 from toolz.itertoolz import interleave
+from fuel.datasets.hdf5 import H5PYDataset
+from fuel.transformers import Flatten
+from fuel.schemes import SequentialScheme
 
 
 class LeNet(FeedforwardSequence, Initializable):
@@ -141,7 +144,7 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
     if pool_sizes is None:
         pool_sizes = [2, 2]
     image_size = (28, 28)
-    output_size = 10
+    output_size = 3
 
     # Use ReLUs everywhere and softmax for the final prediction
     conv_activations = [Rectifier() for _ in feature_maps]
@@ -184,16 +187,27 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
 
     cg = ComputationGraph([cost, error_rate])
 
-    mnist_train = MNIST(("train",))
-    mnist_train_stream = DataStream.default_stream(
-        mnist_train, iteration_scheme=ShuffledScheme(
-            mnist_train.num_examples, batch_size))
+    # mnist_train = MNIST(("train",))
+    # mnist_train_stream = DataStream.default_stream(
+    #     mnist_train, iteration_scheme=ShuffledScheme(
+    #         mnist_train.num_examples, batch_size))
+    #
+    # mnist_test = MNIST(("test",))
+    # mnist_test_stream = DataStream.default_stream(
+    #     mnist_test,
+    #     iteration_scheme=ShuffledScheme(
+    #         mnist_test.num_examples, batch_size))
 
-    mnist_test = MNIST(("test",))
-    mnist_test_stream = DataStream.default_stream(
-        mnist_test,
-        iteration_scheme=ShuffledScheme(
-            mnist_test.num_examples, batch_size))
+    train_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/cross_class.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/cross_class.hdf5', which_sets=('test',))
+    # train_n = train_set.num_examples
+    train_n = 300
+    # train_set.data_sources[0] = train_set.data_sources[0].reshape((train_n,1,28,28))
+    # test_set.data_sources[0] = test_set.data_sources[0].reshape((test_set.num_examples, 1, 28, 28))
+    mnist_train_stream = Flatten(
+        DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(range(100)+range(1000,1100)+range(2000,2100), batch_size)))
+    mnist_test_stream = Flatten(
+        DataStream.default_stream(test_set, iteration_scheme=SequentialScheme(test_set.num_examples, batch_size)))
 
     # Train with simple SGD
     algorithm = GradientDescent(

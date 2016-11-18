@@ -126,7 +126,7 @@ def main():
 
 
     for iteration in range(1):
-        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/mnist_lenet-simple-20161101-232031/mnist_lenet' #window 5, iter 3
+        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/mnist_lenet-simple-20161101-232031/' #window 5, iter 3
         try:
             with open(oldmodel_address, "rb") as f:
                 # oldmodel = pickle.load(f)

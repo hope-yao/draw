@@ -19,7 +19,7 @@ from blocks.bricks import Random, Initializable, MLP, Linear, Rectifier
 from blocks.bricks.conv import Convolutional, Flattener, ConvolutionalSequence, MaxPooling
 from blocks.bricks import Identity, Tanh, Logistic
 from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum
-from blocks.bricks import Tanh, Identity, Softmax
+from blocks.bricks import Tanh, Identity, Softmax, Logistic
 from blocks.bricks.cost import BinaryCrossEntropy
 from blocks.bricks.recurrent import SimpleRecurrent, LSTM
 from blocks.initialization import Constant, IsotropicGaussian, Orthogonal, Uniform
@@ -70,10 +70,10 @@ class AttentionReader(Initializable):
         self.output_dim = (height, width)
 
         self.zoomer = ZoomableAttentionWindow(channels, height, width, N)
-        # self.readout = MLP(activations=[Identity()], dims=[c_dim, 2],
-        #                    **kwargs)  # input is the output from RNN
-        reader_dim = [c_dim, 16, 2]
-        self.readout = MLP(activations=[Rectifier(), Rectifier()], dims=reader_dim, **kwargs) # input is the output from RNN
+        self.readout = MLP(activations=[Identity()], dims=[c_dim, 2],
+                           **kwargs)  # input is the output from RNN
+        # reader_dim = [c_dim, 16, 2]
+        # self.readout = MLP(activations=[Rectifier(), Rectifier()], dims=reader_dim, **kwargs) # input is the output from RNN
 
         self.children = [self.readout]
 
@@ -101,7 +101,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
     def __init__(self, image_size, channels, attention, **kwargs):
         super(DrawClassifyModel, self).__init__(**kwargs)
 
-        self.n_iter = 3
+        self.n_iter = 4
         y_dim = 10
         rnn_dim = 64
         num_filters = 16
@@ -151,15 +151,15 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 #-----------------------------------------------------------------------------------------------------------------------
         # USE LeNet
 
-        feature_maps = [20, 50] #[20, 50]
+        feature_maps = [20,50] #[20, 50]
         mlp_hiddens = [500] # 500
-        conv_sizes = [5, 5] # [5, 5]
-        pool_sizes = [2, 2]
+        conv_sizes = [5,5] # [5, 5]
+        pool_sizes = [2]
         image_size = (28, 28)
         output_size = 10
 
         conv_activations = [Rectifier() for _ in feature_maps]
-        mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Softmax()]
+        mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Logistic()]
 
         num_channels = 1
         image_shape = (28, 28)
