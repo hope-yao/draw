@@ -64,12 +64,13 @@ class AttentionReader(Initializable):
 
         self.img_height = height
         self.img_width = width
+        self.channels = channels
         self.N = N
         self.x_dim = x_dim
         self.c_dim = c_dim
         self.output_dim = (height, width)
 
-        self.zoomer = ZoomableAttentionWindow(channels, height, width, N)
+        self.zoomer = ZoomableAttentionWindow(self.channels, height, width, N)
         self.readout = MLP(activations=[Identity()], dims=[c_dim, 2],
                            **kwargs)  # input is the output from RNN
         # reader_dim = [c_dim, 16, 2]
@@ -98,13 +99,12 @@ class AttentionReader(Initializable):
         return r, center_x, center_y
 
 class DrawClassifyModel(BaseRecurrent, Initializable, Random):
-    def __init__(self, image_size, channels, attention, **kwargs):
+    def __init__(self, image_size, channels, attention, n_iter, **kwargs):
         super(DrawClassifyModel, self).__init__(**kwargs)
 
-        self.n_iter = 4
-        y_dim = 10
-        rnn_dim = 64
-        num_filters = 16
+        self.n_iter = n_iter
+        self.channels = channels
+        self.attention = attention
 
         rnninits = {
             # 'weights_init': Orthogonal(),
@@ -151,17 +151,17 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 #-----------------------------------------------------------------------------------------------------------------------
         # USE LeNet
 
-        feature_maps = [20,50] #[20, 50]
-        mlp_hiddens = [500] # 500
+        feature_maps = [4,4] #[20, 50]
+        mlp_hiddens = [16] # 500
         conv_sizes = [5,5] # [5, 5]
-        pool_sizes = [2]
+        pool_sizes = [1]
         image_size = (28, 28)
-        output_size = 10
+        output_size = 2
 
         conv_activations = [Rectifier() for _ in feature_maps]
-        mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Logistic()]
+        mlp_activations = [Rectifier() for _ in mlp_hiddens] + [Softmax()]
 
-        num_channels = 1
+        num_channels = self.channels
         image_shape = (28, 28)
         filter_sizes = zip(conv_sizes, conv_sizes)
         feature_maps = feature_maps
@@ -205,15 +205,15 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 
 # -----------------------------------------------------------------------------------------------------------------------
         # Configure attention mechanism
-        read_N = attention
-        read_N = int(read_N)
+        self.read_N = self.attention
+        self.read_N = int(self.read_N)
 
         self.conv_sequence._push_allocation_config()
         conv_out_dim = self.conv_sequence.get_dim('output')
         self.conv_out_dim_flatten = np.prod(conv_out_dim)
         reader = AttentionReader(x_dim=self.x_dim, c_dim=self.conv_out_dim_flatten,
                                  channels=channels, width=img_width, height=img_height,
-                                 N=read_N, **inits)
+                                 N=self.read_N, **inits)
         # reader = Reader(x_dim=self.x_dim)
 
         self.reader = reader
@@ -243,7 +243,7 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
 
     def get_dim(self, name):
         if name == 'y':
-            return 10 # for mnist_lenet
+            return 2 # for mnist_lenet
         elif name == 'c':
             return self.conv_out_dim_flatten
         elif name == 'r':
@@ -275,9 +275,9 @@ class DrawClassifyModel(BaseRecurrent, Initializable, Random):
         # y = self.decoder_mlp.apply(c)
 
         rr, center_y, center_x = self.reader.apply(x, c)
-        r = T.minimum(r + rr,1.) # combine revealed images
+        r = r + rr # combine revealed images
         batch_size = r.shape[0]
-        c_raw = self.conv_sequence.apply(r.reshape((batch_size,1,28,28)))
+        c_raw = self.conv_sequence.apply(r.reshape((batch_size,self.channels,28,28)))
         c = self.flattener.apply(c_raw)
         y = self.top_mlp.apply(c)
 

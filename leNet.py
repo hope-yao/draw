@@ -76,7 +76,7 @@ class LeNet(FeedforwardSequence, Initializable):
     def __init__(self, conv_activations, num_channels, image_shape,
                  filter_sizes, feature_maps, pooling_sizes,
                  top_mlp_activations, top_mlp_dims,
-                 conv_step=None, border_mode='valid', **kwargs):
+                 conv_step=None, border_mode='half', **kwargs):
         if conv_step is None:
             self.conv_step = (1, 1)
         else:
@@ -144,7 +144,7 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
     if pool_sizes is None:
         pool_sizes = [2, 2]
     image_size = (28, 28)
-    output_size = 3
+    output_size = 2
 
     # Use ReLUs everywhere and softmax for the final prediction
     conv_activations = [Rectifier() for _ in feature_maps]
@@ -175,11 +175,11 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
         else:
             logging.info("Layer {} ({}) dim: {} {} {}".format(
                 i, layer.__class__.__name__, *layer.get_dim('output')))
-    x = tensor.tensor4('features')
+    x = tensor.fmatrix('features')
     y = tensor.lmatrix('targets')
 
     # Normalize input and apply the convnet
-    probs = convnet.apply(x)
+    probs = convnet.apply(x.reshape((x.shape[0],1,28,28)))
     cost = (CategoricalCrossEntropy().apply(y.flatten(), probs)
             .copy(name='cost'))
     error_rate = (MisclassificationRate().apply(y.flatten(), probs)
@@ -198,21 +198,25 @@ def main(save_to, num_epochs, feature_maps=None, mlp_hiddens=None,
     #     iteration_scheme=ShuffledScheme(
     #         mnist_test.num_examples, batch_size))
 
-    train_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/cross_class.hdf5', which_sets=('train',))
-    test_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/cross_class.hdf5', which_sets=('test',))
+    train_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/potcup2d.hdf5', which_sets=('train',))
+    test_set = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/potcup2d.hdf5', which_sets=('test',))
     # train_n = train_set.num_examples
     train_n = 300
-    # train_set.data_sources[0] = train_set.data_sources[0].reshape((train_n,1,28,28))
+    # train_set.data_sources[0] = train_set.data_sources[0].reshape((train_set.num_examples,1,28,28))
     # test_set.data_sources[0] = test_set.data_sources[0].reshape((test_set.num_examples, 1, 28, 28))
     mnist_train_stream = Flatten(
-        DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(range(100)+range(1000,1100)+range(2000,2100), batch_size)))
+        # DataStream.default_stream(train_set, iteration_scheme=SequentialScheme(range(100)+range(1000,1100)+range(2000,2100), batch_size)))
+        DataStream.default_stream(train_set,
+                                  iteration_scheme=SequentialScheme(train_set.num_examples, batch_size)))
     mnist_test_stream = Flatten(
         DataStream.default_stream(test_set, iteration_scheme=SequentialScheme(test_set.num_examples, batch_size)))
 
     # Train with simple SGD
     algorithm = GradientDescent(
         cost=cost, parameters=cg.parameters,
-        step_rule=Scale(learning_rate=0.1))
+        step_rule=Scale(learning_rate=0.01))
+
+
     # `Timing` extension reports time for reading data, aggregating a batch
     # and monitoring;
     # `ProgressBar` displays a nice progress bar during training.
@@ -246,14 +250,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = ArgumentParser("An example of training a convolutional network "
                             "on the MNIST dataset.")
-    parser.add_argument("--num-epochs", type=int, default=100,
+    parser.add_argument("--num-epochs", type=int, default=500,
                         help="Number of training epochs to do.")
-    parser.add_argument("save_to", default="mnist_lenet", nargs="?",
+    parser.add_argument("save_to", default="potcup2d_lenet", nargs="?",
                         help="Destination to save the state of the training "
                              "process.")
     parser.add_argument("--feature-maps", type=int, nargs='+',
-                        default=[20, 50], help="List of feature maps numbers.")
-    parser.add_argument("--mlp-hiddens", type=int, nargs='+', default=[500],
+                        default=[16, 16], help="List of feature maps numbers.")
+    parser.add_argument("--mlp-hiddens", type=int, nargs='+', default=[16],
                         help="List of numbers of hidden units for the MLP.")
     parser.add_argument("--conv-sizes", type=int, nargs='+', default=[5, 5],
                         help="Convolutional kernels sizes. The kernels are "

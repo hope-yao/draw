@@ -74,12 +74,12 @@ def draw():
     test_dataset = loadmat('c:/users/p2admin/documents/max/projects/draw/draw/datasets/test_data.mat').get('test')
     total_height = rows * height + (rows-1)
     total_width  = cols * width + (cols-1)
-    arr = test_dataset
+    arr = train_dataset3
     arr = arr - arr.min()
     # scale = (arr.max() - arr.min())
     # arr = arr / scale
-    I = np.zeros((3, total_height, total_width))# highlight writing window
-    I.fill(1)
+    I = 255*np.ones((3, total_height, total_width))# highlight writing window
+    I.fill(255)
     for i in xrange(N):
         r = i // cols
         c = i % cols
@@ -88,7 +88,7 @@ def draw():
         I[:, offset_y:(offset_y+height), offset_x:(offset_x+width)] = this.reshape(1,height,width)
     out = np.dstack(I).astype(np.uint8)
     img = Image.fromarray(out)
-    img.save("crosstest.png")
+    img.save("cross3.png")
 
 
 import tarfile
@@ -366,7 +366,7 @@ def test():
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # draw()
+    draw()
     # train()
     # test()
-    visualize_filter()
+    # visualize_filter()

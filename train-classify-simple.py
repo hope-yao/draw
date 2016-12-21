@@ -28,7 +28,7 @@ from fuel.streams import DataStream
 from fuel.schemes import SequentialScheme
 from fuel.transformers import Flatten
 
-from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum, Scale
+from blocks.algorithms import GradientDescent, CompositeRule, StepClipping, RMSProp, Adam, Momentum, Scale, AdaDelta
 from blocks.bricks import Tanh, Identity
 from blocks.bricks.cost import BinaryCrossEntropy, CategoricalCrossEntropy, MisclassificationRate
 from blocks.bricks.conv import Convolutional, ConvolutionalSequence
@@ -66,17 +66,19 @@ sys.setrecursionlimit(100000)
 
 def main():
     batch_size = 100
-    n_iter = 6
-    attention = 7
-    learning_rate = 1e-4
-    epochs = 300
-    dataset = 'mnist_lenet'
+    n_iter = 5
+    attention = 5
+    learning_rate = 1e-2
+    epochs = 500
+    dataset = 'potcup2d'
     image_size = (28, 28)
     channels = 1
 
     # image_size, channels, data_train, data_valid, data_test = datasets.get_data(dataset)
-    data_train = MNIST(which_sets=["train"], sources=['features', 'targets'])
-    data_test = MNIST(which_sets=["test"], sources=['features', 'targets'])
+    # data_train = MNIST(which_sets=["train"], sources=['features', 'targets'])
+    # data_test = MNIST(which_sets=["test"], sources=['features', 'targets'])
+    data_train = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/potcup2d_ux.hdf5', which_sets=('train',))
+    data_test = H5PYDataset('c:/users/p2admin/documents/max/projects/draw/draw/datasets/potcup2d_ux.hdf5', which_sets=('test',))
 
     train_stream = Flatten(
         DataStream.default_stream(data_train, iteration_scheme=SequentialScheme(data_train.num_examples, batch_size)))
@@ -104,7 +106,7 @@ def main():
     #
     # lr_str = lr_tag(learning_rate)
 
-    subdir = dataset + "-simple-" + time.strftime("%Y%m%d-%H%M%S")
+    subdir = "./results/" + dataset + time.strftime("%Y%m%d-%H%M%S")
     # subdir = dataset + "-simple-20161101-2031"
 
     # longname = "%s-%s-t%d-rnn%d-y%d-lr%s" % (dataset, attention_tag, n_iter, rnn_dim, y_dim, lr_str)
@@ -126,7 +128,7 @@ def main():
 
 
     for iteration in range(1):
-        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/mnist_lenet-simple-20161101-232031/' #window 5, iter 3
+        oldmodel_address = 'C:\Users\p2admin\Documents\Max\Projects\draw/results/potcup2d20161217-211537/' #window 5, iter 3
         try:
             with open(oldmodel_address, "rb") as f:
                 # oldmodel = pickle.load(f)
@@ -137,7 +139,7 @@ def main():
                 f.close()
         except:
             ## initialize trained model
-            draw = DrawClassifyModel(image_size=image_size, channels=channels, attention=attention)
+            draw = DrawClassifyModel(image_size=image_size, channels=channels, attention=attention, n_iter=n_iter)
             draw.push_initialization_config()
             draw.conv_sequence.layers[0].weights_init = Uniform(width=.2)
             draw.conv_sequence.layers[1].weights_init = Uniform(width=.09)
@@ -202,13 +204,14 @@ def main():
         algorithm = GradientDescent(
             cost=cost,
             parameters=params,
-            # step_rule=CompositeRule([
-            #     StepClipping(10.),
-            #     Adam(learning_rate),
-            # ])
+            step_rule=CompositeRule([
+                StepClipping(10.),
+                Adam(learning_rate),
+            ])
+            # step_rule=AdaDelta()
             # step_rule=RMSProp(learning_rate),
             # step_rule=Momentum(learning_rate=learning_rate, momentum=0.95)
-            step_rule=Scale(learning_rate=learning_rate)
+            # step_rule=Scale(learning_rate=learning_rate)
         )
 
         # ------------------------------------------------------------------------
